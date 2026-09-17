@@ -20,6 +20,8 @@ import { buildScenes } from './scenes.js';
 import { createPointCloud } from './point-cloud.js';
 import { createLightVolume } from './light-volume.js';
 import { createWordLayer } from './word-layer.js';
+import { paintScene, blurredCopy } from './scene-painter.js';
+import { readPainted, IMAGE_PLANE } from './image-cloud.js';
 
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -80,13 +82,35 @@ async function boot() {
   const camera = new THREE.PerspectiveCamera(cam.fov, window.innerWidth / window.innerHeight, cam.near, cam.far);
   camera.position.set(...cam.keys[0].pos);
 
-  const sceneData = buildScenes(tierCfg.points);
+  /* Paint the source image, then sample it. Everything the cloud knows about
+     colour and depth comes from these two canvases. */
+  const painted = paintScene({ width: 1600, height: 1000, seed: 7 });
+  const src = readPainted(painted);
+
+  const sceneData = buildScenes(tierCfg.points, src);
   let cloud = createPointCloud({
     scenes: sceneData,
     count: tierCfg.points,
     pixelRatio: dpr(),
   });
   scene.add(cloud.mesh);
+
+  /* Backdrop: the same image, heavily blurred, on a plane behind everything.
+     This is what shows THROUGH the stipple. Without it the gaps between
+     points go to flat clear colour and the whole thing reads as confetti
+     rather than as a photograph being taken apart. */
+  const backdropTex = new THREE.CanvasTexture(blurredCopy(painted.colour, 11));
+  backdropTex.colorSpace = THREE.SRGBColorSpace;
+  const backdropZ = IMAGE_PLANE.zFar - 9;
+  const bw = IMAGE_PLANE.worldWidth * 2.3;
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(bw, bw * (painted.height / painted.width)),
+    new THREE.MeshBasicMaterial({ map: backdropTex, depthWrite: false, toneMapped: false }),
+  );
+  backdrop.position.z = backdropZ;
+  backdrop.renderOrder = -1;
+  backdrop.frustumCulled = false;
+  scene.add(backdrop);
 
   let light = createLightVolume(tierCfg.lightLayers);
   scene.add(light.group);
@@ -199,7 +223,7 @@ async function boot() {
     app,
     scroll: scroll.state,
     fluid: fluid.state,
-    renderer, scene, camera, light,
+    renderer, scene, camera, light, painted,
     get tier() { return CONFIG.tiers[app.tier].name; },
   };
 

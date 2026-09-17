@@ -107,22 +107,26 @@ export function createPointCloud({ scenes, count, pixelRatio }) {
      fraction of the screen at many times the overlap — the compact scenes
      blow out to white while the open ones look correct.
 
-     Brightness goes roughly as count / area, so weighting by (R / Rref)^2
-     — R being each scene's RMS radius — lands every scene at a comparable
-     exposure. Measured on a stride so a 220k-point scene still costs
-     microseconds. */
+     With opaque points this shows up as coverage rather than blowout: a
+     compact scene turns into a solid lump. Weighting by the scene's RMS
+     radius keeps roughly the same amount of picture visible either way.
+     Measured on a stride, so a 220k-point scene still costs microseconds. */
   const sceneWeights = scenes.map((sc) => rmsRadius(sc.positions, count));
   const refRadius = sceneWeights[0] || 1;
   for (let i = 0; i < sceneWeights.length; i++) {
     const ratio = sceneWeights[i] / refRadius;
-    sceneWeights[i] = Math.min(1.3, Math.max(0.12, ratio * ratio));
+    sceneWeights[i] = Math.min(1.15, Math.max(0.52, Math.pow(ratio, 1.1)));
   }
 
-  /* Density compensation. Brightness under additive blending is roughly
-     opacity × count, so a tier with 5× the points needs 1/5 the per-point
-     opacity to land at the same exposure. Without this, every tier is a
-     different picture and only one of them is the one you designed. */
-  const densityScale = Math.min(1.4, P.densityReference / count);
+  /* Density compensation — now on SIZE, not opacity.
+
+     With additive blending this had to dim each point as the count rose, or
+     the dense tiers blew out. With opaque points the relationship inverts:
+     more points should mean a FINER picture, not a dimmer one. So the point
+     size shrinks as 1/sqrt(count), which holds total screen coverage roughly
+     constant while the grain gets smaller. Every tier shows the same image;
+     the expensive ones just resolve it better. */
+  const sizeScale = Math.sqrt(P.densityReference / count);
 
   const uniforms = {
     uPosTex:        { value: posTex },
@@ -153,7 +157,7 @@ export function createPointCloud({ scenes, count, pixelRatio }) {
     uScrollVel:     { value: 0 },
     uScrollSmear:   { value: F.scrollSmear },
 
-    uSize:           { value: P.sizeBase },
+    uSize:           { value: P.sizeBase * sizeScale },
     uSizeVariance:   { value: P.sizeVariance },
     uScrollSizeGain: { value: F.scrollSizeGain },
     uPixelRatio:     { value: pixelRatio },
@@ -166,20 +170,28 @@ export function createPointCloud({ scenes, count, pixelRatio }) {
     uTint:        { value: new THREE.Color(PAL.tint) },
     uTintAmount:  { value: PAL.tintAmount },
     uExposure:    { value: P.exposure },
-    uOpacity:     { value: P.opacity * densityScale },
+    uOpacity:     { value: P.opacity },
     uSoftness:    { value: P.softness },
   };
 
   const material = new THREE.ShaderMaterial({
     uniforms, vertexShader, fragmentShader,
-    transparent: true,
-    // Additive on a dark ground is what turns a pile of dots into light.
-    blending: THREE.AdditiveBlending,
-    // Depth-sorting hundreds of thousands of transparent points is both
-    // expensive and pointless under additive blending, where order doesn't
-    // change the result.
-    depthTest: false,
-    depthWrite: false,
+    /* Normal blending over a real depth buffer, NOT additive.
+
+       Additive was the single biggest thing wrong with the first version:
+       it can only ever ADD light, so it cannot paint a dark tree against a
+       pale sky — everything glows. The reference is plainly an image, with
+       dark points sitting over a bright background, which only alpha
+       blending can do.
+
+       Because the fragment shader discards rather than fading, every
+       surviving fragment is opaque, so these points can write depth. That
+       buys correct occlusion for free: near trees hide far ones, and the
+       word planes get eaten by whatever is in front of them. No sorting. */
+    transparent: false,
+    blending: THREE.NormalBlending,
+    depthTest: true,
+    depthWrite: true,
   });
 
   const mesh = new THREE.Points(geometry, material);

@@ -1,35 +1,36 @@
 /* ============================================================================
    scenes.js — the choreography
 
-   Each entry is one staged moment: a target shape and the DOM section it's
-   locked to. The order here IS the order of the page; change it and both the
-   WebGL and the scroll maths follow. Keep this array, `camera.keys` in
-   config.js, and the `<section data-scene>` elements in index.html the same
-   length — they're index-matched.
+   Each entry is one staged moment, index-matched to `camera.keys` in
+   config.js and to the `<section data-scene>` elements in index.html. All
+   three arrays must stay the same length.
 
-   Note that the landscape bookends the sequence. The abstract scenes in
-   between are the same world rearranged (they borrow its colour logic from
-   world.js), so the piece reads as one place coming apart and settling back,
-   rather than as a slideshow of unrelated shapes.
+   Scene 0 and scene 5 are the photograph itself. Everything between is that
+   same photograph rearranged — the abstract shapes take their colour by
+   projecting back onto the picture plane, so the piece reads as one place
+   coming apart and settling back rather than as a slideshow.
    ========================================================================= */
 
-import {
-  landscapePoints, worldCloud, worldSphere,
-  worldPanels, worldWave, worldTorus, worldText,
-} from './shapes.js';
+import { imageCloud, colourByProjection } from './image-cloud.js';
+import { cloudPoints, spherePoints, panelPoints, wavePoints, torusPoints } from './shapes.js';
 
-export function buildScenes(count) {
+export function buildScenes(count, src) {
+  const shaped = (positions, seed) => ({
+    positions,
+    colors: colourByProjection(positions, count, src),
+    seed,
+  });
+
   return [
-    { id: 'hero',     ...landscapePoints(count, { seed: 3, treeCount: 8 }) },
-    { id: 'dissolve', ...worldCloud(count, { radius: 4.0, flatten: 0.72 }) },
-    { id: 'sphere',   ...worldSphere(count, { radius: 2.6, thickness: 0.45 }) },
-    { id: 'panels',   ...worldPanels(count, { layers: 5, width: 7, height: 4.0, gap: 1.0 }) },
-    { id: 'wave',     ...worldWave(count, { width: 13, depthSpan: 14, amp: 1.0 }) },
-    { id: 'return',   ...landscapePoints(count, { seed: 19, treeCount: 6, lean: 0.4 }) },
-    { id: 'outro',    ...worldCloud(count, { radius: 5.0, flatten: 0.5, seed: 61 }) },
+    { id: 'hero',     ...imageCloud(count, src, { seed: 5 }) },
+    { id: 'dissolve', ...shaped(cloudPoints(count, { radius: 5.0, flatten: 0.78 })) },
+    { id: 'sphere',   ...shaped(spherePoints(count, { radius: 3.4, thickness: 0.7 })) },
+    { id: 'panels',   ...shaped(panelPoints(count, { layers: 5, width: 11, height: 6.4, gap: 1.1 })) },
+    { id: 'wave',     ...shaped(wavePoints(count, { width: 18, depthSpan: 16, amp: 1.5 })) },
+    // Same picture, sprayed harder — it re-forms, but not quite as it was.
+    { id: 'return',   ...imageCloud(count, src, { seed: 5, spray: 4.6, sprayStart: 0.40 }) },
+    { id: 'outro',    ...shaped(cloudPoints(count, { radius: 7.0, flatten: 0.55, seed: 61 })) },
   ];
 }
 
-/* Spares — swap either into buildScenes to try it. worldText makes the cloud
-   spell a word, which is a good effect but a different one. */
-export { worldTorus, worldText };
+export { torusPoints };

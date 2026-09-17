@@ -23,11 +23,13 @@ export const CONFIG = {
      here is the grade applied on top of all of them, plus the page chrome.
      To re-colour the world itself, edit PALETTE in world.js.              */
   palette: {
-    background: '#0d1014',
-    accent:     '#ffd9ec',   // the flash during a scatter transition
-    tint:       '#b9a6cc',   // pushed into every point...
-    tintAmount: 0.05,        // ...by this much. 0 = raw scene colour.
-    light:      '#d9b8d4',   // the volumetric shafts
+    /* Light, not dark. The scene is a bright misty photograph; anything the
+       points don't cover should read as sky, not as void. */
+    background: '#b4adbd',
+    accent:     '#ffe6f2',   // flash during a scatter transition
+    tint:       '#cfc7d6',
+    tintAmount: 0.06,
+    light:      '#ffe9f6',   // the volumetric shafts
   },
 
   /* --- The floating type --------------------------------------------------
@@ -43,8 +45,8 @@ export const CONFIG = {
        the far side of the ring is simply being seen from behind. Flipping
        type by hand would have been the wrong answer to the same picture. */
     orbit: {
-      center:      [0, 0.55, -3.2],
-      radius:      3.8,
+      center:      [0, 0.40, -0.9],
+      radius:      3.6,
       speed:       0.055,  // radians/sec of idle rotation
       scrollSpeed: 2.10,   // radians per section scrolled — the main driver
       tilt:        7,      // degrees the whole ring leans, so it isn't flat on
@@ -70,20 +72,19 @@ export const CONFIG = {
 
   /* --- The points themselves ---------------------------------------------- */
   points: {
-    sizeBase:      7.2,   // px at 1x dpr, at `referenceDistance` from camera
-    exposure:      1.18,  // global multiplier on every point's own colour
-    referenceDistance: 11, // roughly the hero camera's distance to the trees.
-    sizeVariance:  0.75,   // 0 = every point identical, 1 = wildly varied
-    /* Additive blending accumulates, so total brightness is opacity × point
-       count. This value is calibrated AT `densityReference` points and then
-       scaled down automatically for denser tiers — otherwise the ultra tier
-       renders as a white rectangle while the low tier looks correct. More
-       points should mean finer grain, not more light. */
-    opacity:          0.70,
-    densityReference: 40000,
-    softness:      0.72,  // 0 = hard dots, 1 = pure haze
-    flow:          0.16,  // ambient drift. 0 freezes the cloud solid.
-    flowSpeed:     0.22,
+    /* Small and hard. Photographic point clouds are built from tiny opaque
+       dots; the softness lives in how densely they're packed, not in each
+       dot's edges. Large feathered sprites are what make a cloud read as
+       bokeh instead of as an image. */
+    sizeBase:          3.6,   // px at 1x dpr, at `referenceDistance`
+    referenceDistance: 10,
+    densityReference:  90000, // size is calibrated here, scaled by 1/sqrt(n)
+    sizeVariance:      0.45,
+    opacity:           1.00,  // points are opaque; fading is stochastic
+    softness:          0.30,  // 0 = hard discs, 1 = feathered
+    exposure:          1.06,
+    flow:              0.05,  // ambient drift. Low — this is a photograph.
+    flowSpeed:         0.18,
   },
 
   /* --- Scatter & reform ---------------------------------------------------
@@ -121,13 +122,13 @@ export const CONFIG = {
     near: 0.1,
     far:  120,
     keys: [
-      { pos: [ 0.0,  0.5,  5.2], look: [0,  0.5, -7] },  // 0 hero — in among the trees
-      { pos: [ 0.0, -0.3,  2.6], look: [0,  0.2, -8] },  // 1 push through
-      { pos: [ 2.0,  1.0,  6.4], look: [0,  0.2, -3] },  // 2 sphere
-      { pos: [-1.7,  0.6,  5.6], look: [0,  0.0, -2] },  // 3 panels
-      { pos: [ 0.0,  2.6,  6.2], look: [0, -0.7, -5] },  // 4 wave
-      { pos: [ 0.0,  0.7,  7.4], look: [0,  0.5, -7] },  // 5 back to the world
-      { pos: [ 0.0,  1.1, 11.0], look: [0,  0.7, -7] },  // 6 pull out
+      { pos: [ 0.0,  0.10,  9.6], look: [0,  0.0, -2] },  // 0 hero
+      { pos: [ 0.0, -0.30,  5.6], look: [0,  0.1, -4] },  // 1 push into it
+      { pos: [ 2.4,  1.10,  9.0], look: [0,  0.0,  0] },  // 2 sphere
+      { pos: [-2.1,  0.70,  8.2], look: [0,  0.0,  0] },  // 3 panels
+      { pos: [ 0.0,  3.10,  8.6], look: [0, -0.8, -2] },  // 4 wave
+      { pos: [ 0.0,  0.10, 10.4], look: [0,  0.0, -2] },  // 5 back to it
+      { pos: [ 0.0,  0.60, 14.5], look: [0,  0.1, -2] },  // 6 pull out
     ],
     /* How hard the camera drifts with the cursor. Small numbers only. */
     parallax: 0.55,
@@ -144,7 +145,7 @@ export const CONFIG = {
        points.densityReference. */
     referenceLayers: 3,
     spread:    26,    // world units the shafts cover
-    intensity: 0.30,
+    intensity: 0.07,   // subtle: the main light is painted into the image
     drift:     0.035,
     distortion: 1.4,  // how much the fluid field bends the shafts
   },
@@ -165,8 +166,8 @@ export const CONFIG = {
   tiers: [
     { name: 'low',   points:  40000, dpr: 1.00, bloom: false, lightLayers: 2 },
     { name: 'mid',   points:  90000, dpr: 1.35, bloom: false, lightLayers: 3 },
-    { name: 'high',  points: 150000, dpr: 1.75, bloom: true,  lightLayers: 5 },
-    { name: 'ultra', points: 220000, dpr: 2.00, bloom: true,  lightLayers: 5 },
+    { name: 'high',  points: 150000, dpr: 1.75, bloom: false, lightLayers: 3 },
+    { name: 'ultra', points: 220000, dpr: 2.00, bloom: false, lightLayers: 3 },
   ],
 
   /* --- Scroll -------------------------------------------------------------

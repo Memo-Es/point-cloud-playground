@@ -36,11 +36,11 @@ export function createWordLayer() {
       map: texture,
       transparent: true,
       opacity: spec.opacity,
-      // Depth ordering is decided per frame from the word's actual distance
-      // (see update), so the fog can pass in front of the far half of the
-      // ring. Testing against the depth buffer wouldn't help: the points
-      // never write to it.
-      depthTest: false,
+      /* The points write depth now, so the type can simply be depth-tested
+         against them: anything nearer than a letter erodes it. That eaten,
+         half-dissolved type is exactly what the reference shows, and it
+         falls out of the depth buffer rather than being faked. */
+      depthTest: true,
       depthWrite: false,
       // Both faces, because half the ring is seen from behind — that IS the
       // mirroring, and culling backfaces would delete it.
@@ -100,14 +100,9 @@ export function createWordLayer() {
            back. That single line is the whole effect. */
         mesh.rotation.set(tiltRad * Math.cos(a), a, THREE.MathUtils.degToRad(spec.spin ?? 0));
 
-        /* Words further from the camera than the ring's centre draw before
-           the points, so the fog rolls over them. */
-        if (camera) {
-          const d = camera.position.distanceTo(mesh.position);
-          const dCentre = camera.position.distanceTo(
-            _c.set(O.center[0], O.center[1], O.center[2]));
-          mesh.renderOrder = d > dCentre ? 1 : 3;
-        }
+        // Depth testing handles occlusion; render order only needs to put
+        // the type after the cloud so the buffer is already populated.
+        mesh.renderOrder = 4;
       }
     },
 

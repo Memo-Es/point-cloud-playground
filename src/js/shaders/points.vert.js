@@ -53,6 +53,7 @@ attribute vec3  aScatterDir;
 
 varying vec3  vColor;
 varying float vBurst;
+varying float vRand;
 varying float vFade;
 
 /* Both atlases share a layout, so one uv function serves both. */
@@ -143,5 +144,6 @@ void main() {
   /* Colour crossfades with the same staggered t as position, so a point's
      colour arrives exactly when the point does. */
   vColor = mix(sampleCol(uSceneA), sampleCol(uSceneB), tt);
+  vRand = aRandom.z;
 }
 `;

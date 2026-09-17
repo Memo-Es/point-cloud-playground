@@ -57,7 +57,7 @@ export function createLightVolume(layerCount = CONFIG.light.layers) {
     mesh.position.z = -18 + t * 16;
     mesh.position.x = (t - 0.5) * 7;
     mesh.rotation.z = (t - 0.5) * 0.55;
-    mesh.renderOrder = 0;
+    mesh.renderOrder = 5;   // additive, over the cloud, never occluding
     mesh.frustumCulled = false;
 
     group.add(mesh);

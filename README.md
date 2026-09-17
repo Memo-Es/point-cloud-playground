@@ -1,8 +1,8 @@
 # point-cloud-playground
 
-A scroll-driven WebGL point cloud: a coloured, misty landscape you fall
-through, with crisp vector type suspended inside it. One shared fluid field,
-volumetric light, and four GPU tiers that pick themselves.
+A photographic scene rendered as a point cloud, with crisp vector type
+orbiting inside it. Scroll takes the picture apart and puts it back. One
+shared fluid field, four GPU tiers that pick themselves.
 
 Built as a **technique study** after the engineering behind
 [Shopify Editions Spring '26](https://www.shopify.com/editions/spring2026).
@@ -39,22 +39,21 @@ knobs worth reaching for first:
 
 | Want | Change | Try |
 |---|---|---|
+| Repaint the **scene itself** | `src/js/scene-painter.js` | trees, sky, light, ground |
+| Move the light | the glow position in `scene-painter.js` | everything warms toward it |
 | Different word | `words.hero` | any short string |
 | Move / add / delete floating words | `wordLayer.instances` | `angle` places them on the ring |
 | How fast the words circle | `wordLayer.orbit.scrollSpeed` | radians per section |
 | How close the words pass | `wordLayer.orbit.radius`, `.center` | front edge vs. the camera |
-| Re-colour the **world** | `PALETTE` in `src/js/world.js` | grass, haze, glow, speckle |
-| Grade everything at once | `palette.tint`, `.tintAmount` | 0 = raw scene colour |
-| Brighter / darker overall | `points.exposure` | 0.8 – 1.6 |
+| How hard the edges dissolve | `IMAGE_PLANE.spray`, `.sprayStart` | in `image-cloud.js` |
 | Denser / sparser cloud | `tiers[n].points` | 40k–220k |
-| Bigger grains | `points.sizeBase` | 1.5 → 5 |
-| Hazier, less dotty | `points.softness` | 0.45 → 0.9 |
+| Bigger grains | `points.sizeBase` | 2 → 6 |
+| Softer dots | `points.softness` | 0.3 → 0.8 |
+| Brighter / darker | `points.exposure` | 0.85 – 1.3 |
 | Wilder transitions | `morph.scatter` | 3.4 → 8 |
 | Longer, lazier trails | `morph.stagger` | 0.55 → 0.85 |
 | Points hold formed longer | `morph.holdStart` | 0.45 → 0.7 |
 | Stronger cursor push | `fluid.pointerPush` | 0.55 → 1.5 |
-| Move the light source | `LIGHT` in `world.js` | everything warms toward it |
-| More / less glow | `bloom.strength` | 0.3 → 1.2 |
 
 Add `?tier=0` … `?tier=3` to the URL to force a GPU tier. It's the only sane
 way to see what the low end actually looks like without owning a slow phone.
@@ -122,27 +121,70 @@ Every instance shares one canvas texture; mirroring is a negative X scale.
 (`worldText()` in `shapes.js` will still spell a word out of points if you
 want it — it's a good effect, just a different one.)
 
-### Colour lives in a second atlas
+### It starts as an image, because the reference does
 
-The reference bakes its point clouds from captured imagery: every point
-carries a colour, which is what its custom `.mdpc` format exists to compress.
+The reference bakes its point clouds from captured imagery — every point
+carries the colour of a real pixel, which is what its `.mdpc` format exists to
+compress. That is the main reason it reads as a photograph rather than as a
+particle system: **the cloud has a subject.**
 
-There's no photograph here, so colour is reasoned about instead of sampled —
-`world.js` holds a small palette, assigned by region and by distance to one
-light source, with heavy per-point jitter and a ~1-in-9 bright speckle. That
-speckle is what keeps the cloud reading as *captured* rather than *generated*;
-without it you get a smooth gradient that looks like a screensaver.
+The first version of this repo skipped that and generated points from maths.
+It looked like weather. It was not close.
 
-Colours ride in a second atlas alongside the positions — but at **RGBA8, not
-float**. Positions need float precision; colour never does, and 8-bit is a
-quarter of the memory. (Same instinct as the reference's chroma subsampling,
-taken to where it actually pays.)
+So `scene-painter.js` paints a source scene — a misty stand of trees under a
+lit sky — into two 2D canvases from one seed:
 
-Because every scene pulls colour from the same light and the same palette, the
-abstract scenes read as the landscape *rearranging itself* rather than as a
-slideshow of unrelated shapes.
+- **colour**, what each point looks like
+- **depth**, greyscale, which becomes each point's z
 
-### The point atlas
+`image-cloud.js` then does something deliberately dumb: pick a pixel, take its
+colour, take its depth, place a point. That *is* what a photogrammetric point
+cloud from a single image is. Two departures from a straight projection:
+
+- **Edge spray.** Points near the frame edge get pushed outward and scattered
+  in z, so the picture dissolves into loose particles instead of stopping at a
+  rectangle. This is the signature of the whole effect and it's worth more
+  than any amount of extra density in the middle.
+- **Ground tilt.** A flat projection makes the ground a vertical wall — every
+  pixel keeps its row's y, and only z varies. Everything below the horizon is
+  tilted down and forward to lay it back into a floor. It's the one place the
+  projection has to lie.
+
+It is 2.5D, not 3D. There is nothing behind the trees — exactly the limitation
+a single-image capture has.
+
+A heavily blurred copy of the same image sits on a plane behind everything.
+That's what shows **through** the stipple. Without it the gaps go to flat clear
+colour and the whole thing reads as confetti.
+
+### Normal blending, not additive — and a real depth buffer
+
+The second thing the first version got badly wrong.
+
+Additive blending can only ever *add* light. It cannot paint a dark tree
+against a pale sky, so everything glows and the result reads as particles.
+The reference is plainly an image: dark points over a bright background. Only
+alpha blending does that.
+
+So the points are **opaque**, on a **light** background:
+
+- The fragment shader draws a near-binary disc and **discards** rather than
+  fading. Fading is stochastic — each point is culled against a per-point
+  random threshold — because semi-transparent fragments that write depth punch
+  holes in whatever is behind them.
+- Every surviving fragment is opaque, so the points **write depth**. That buys
+  correct occlusion for free: near trees hide far ones, and no sorting is
+  needed at any point count.
+- Which in turn means the type can simply be **depth-tested against the
+  cloud**. Foliage in front of a letter erodes it. That half-eaten type is
+  exactly what the reference shows, and it falls out of the depth buffer
+  rather than being faked.
+
+Points are also small and hard, not big and feathered. Photographic point
+clouds get their softness from how densely dots are packed, not from each
+dot's edges — feathered sprites are what make a cloud read as bokeh.
+
+### The point atlas### The point atlas
 
 Seven target shapes — two words, a nebula, a sphere, depth-layered panels, a
 wave field, a third word — are each just a `Float32Array` of xyz. All seven get
@@ -194,21 +236,29 @@ The camera interpolates **continuously** while the cloud **holds** — formed an
 legible — until you're most of the way through a section. That mismatch is
 where the parallax comes from.
 
-### Brightness is density-compensated
+### Density compensation, twice, in opposite directions
 
-Under additive blending, total brightness is roughly *opacity × point count*.
-So the ultra tier, with 5.5× the points of the low tier, renders 5.5× brighter
-— a white rectangle — unless you correct for it.
+Both of these were found by *measuring* frames, not by looking at them — which
+is the point. Neither is visible on the machine you tune on.
 
-`points.opacity` is therefore calibrated at a stated reference count
-(`densityReference`) and scaled down automatically as the count goes up. More
-points buys **finer grain, not more light**. Without this, every tier is a
-different picture and only one of them is the one you designed.
+**While the points were additive**, brightness went as *opacity × count*, so
+the 220k tier rendered 5.5× brighter than the 40k tier: a white rectangle.
+And it went as *count ÷ area*, so compact scenes blew out where open ones
+looked right — the sphere and panels were clipping 39% of pixels while the
+landscape looked fine.
 
-This is the single easiest thing to get wrong in a tiered particle system, and
-it doesn't show up until you test on hardware that isn't yours.
+**Now that the points are opaque, the count relationship inverts.** More points
+should mean a *finer* picture, not a dimmer one. So point size shrinks as
+`1/sqrt(count)`, which holds total screen coverage roughly constant while the
+grain gets smaller. Every tier shows the same image; the expensive ones just
+resolve it better.
 
-### Four GPU tiers
+The spatial weighting survives, but it now controls *coverage* rather than
+exposure: with opaque points a compact scene turns into a solid lump instead
+of blowing out, so each scene is weighted by its RMS radius to keep roughly
+the same amount of picture visible.
+
+### Four GPU tiers### Four GPU tiers
 
 Picked at boot from core count, device memory, mobile UA and the unmasked
 GPU string. Then a watchdog samples frame times and steps **down** if the
@@ -256,40 +306,40 @@ usually gets dropped.
 
 Things the original does that this doesn't:
 
-- **No captured source data.** The original ships bespoke `.mdpc` point clouds
-  with quantised positions and chroma subsampling, baked from real imagery.
-  Everything here is generated procedurally at boot — nothing to download, but
-  also no photographic truth behind the colour. It's a painted landscape, not
-  a scanned one.
-- **No true raymarched light volumes**, and no KTX2 array textures. The light
-  here is a stack of additive gradient quads. See above.
-- **No transparent video layer.** The original solves cross-browser
-  transparent video; there's no video here at all.
+- **The source image is painted, not captured.** The original bakes real
+  imagery into a bespoke `.mdpc` format with quantised positions and chroma
+  subsampling. Here a forest is drawn procedurally into a canvas at boot and
+  sampled from that. Nothing to download, but no photographic truth either —
+  the trees are stylised, and up close they are visibly made of discs.
+- **2.5D, not 3D.** There is nothing behind the trees. Push the camera far
+  enough through the scene and it falls apart.
+- **No raymarched light volumes**, no KTX2 array textures, no transparent
+  video layer. The glow is painted into the source image.
 - **The position atlas is not memory-frugal.** RGBA32F × 7 scenes at tier 3 is
-  roughly 22MB of VRAM. Half-float would halve it at no visible cost; it's left
-  as `Float32` because the encoding code obscures the idea. (Colour is already
-  8-bit.)
-- **The type doesn't react to the cloud.** In the reference, points and
-  lettering feel mutually aware. Here the words drift with the same fluid
-  field but nothing occludes anything — the word quads simply draw last.
+  roughly 22MB of VRAM. Half-float would halve it at no visible cost. (Colour
+  is already 8-bit.)
+- **Still fewer points than the reference**, which is why its stipple is finer
+  than this one's at every tier.
 
 ## File map
 
 ```
 index.html              7 sections, one per scene. Import map lives here.
-src/css/main.css        The DOM layer. Legibility over a bright moving volume.
+src/css/main.css        The DOM layer. Legibility over a bright moving image.
 src/js/
   config.js             ← every knob. Start here.
-  world.js              ← the colour language: palette, light, speckle.
+  scene-painter.js      ← paints the source image + its depth map
+  image-cloud.js        ← samples that image into points
   main.js               boot + the render loop
   scenes.js             which shape belongs to which section
-  shapes.js             target generators (landscape, cloud, sphere, panels, wave)
+  shapes.js             the abstract target shapes
   point-cloud.js        the two atlases, the attributes, the material
-  word-layer.js         crisp vector type suspended in the volume
-  light-volume.js       the additive quad stack
+  word-layer.js         vector type on a 3D orbit ring
+  light-volume.js       additive gradient quads
   fluid-field.js        one shared disturbance source
   scroll.js             Lenis + scroll state as a plain object
   device-tier.js        tier detection + frame budget watchdog
+  rng.js, world.js      seeded randomness, palette helpers
   shaders/              GLSL, as tagged template strings
 ```
 
