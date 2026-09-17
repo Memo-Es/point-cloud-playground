@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point Cloud Hero — a scroll-driven WebGL study</title>
+<meta name="description" content="A scroll-driven WebGL point cloud: type that scatters and reforms, a shared fluid field, volumetric light, and four-tier GPU scaling.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305060a'/%3E%3Cg fill='%237ef5d0'%3E%3Ccircle cx='9' cy='12' r='2'/%3E%3Ccircle cx='17' cy='8' r='1.4'/%3E%3Ccircle cx='23' cy='15' r='2.4'/%3E%3Ccircle cx='12' cy='21' r='1.8'/%3E%3Ccircle cx='21' cy='24' r='1.2'/%3E%3C/g%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap">
+<link rel="stylesheet" href="./src/css/main.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js",
+    "lenis": "https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.mjs"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<!-- The canvas is decorative. Every word it draws also exists in the DOM. -->
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<div id="loader" aria-hidden="true"><span></span></div>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="chrome">
+  <div class="chrome__left">
+    <a class="mark" href="#main">
+      <span class="mark__glyph" aria-hidden="true"></span>
+      Point Cloud <span class="mark__muted">Study 01</span>
+    </a>
+    <nav class="chrome__nav" aria-label="Sections">
+      <a href="#scenes">Scenes</a>
+      <a href="#index">Contents</a>
+    </nav>
+  </div>
+  <div class="chrome__right">
+    <button id="motion-toggle" type="button" aria-pressed="true">
+      <span class="dot" aria-hidden="true"></span><span data-label>Motion on</span>
+    </button>
+    <a class="pill" href="https://github.com/Memo-Es/point-cloud-playground">Source</a>
+  </div>
+</header>
+
+<div class="rail" aria-hidden="true"><i id="rail-fill"></i></div>
+
+<main id="main">
+
+  <!-- 0 ────────────────────────────────────────── hero / the landscape -->
+  <!--
+    Layout mirrors the reference: the volume is full-bleed and unobstructed,
+    the type floats INSIDE it (drawn in WebGL, see word-layer.js), and the
+    only DOM in the viewport is a tagline bottom-left and an index bottom-
+    right. Nothing sits over the optical centre, because the optical centre
+    is the picture.
+  -->
+  <section class="s s--hero" data-scene="hero">
+    <!-- The word the cloud is standing in is drawn in the scene. This is
+         what a screen reader, a crawler and a WebGL-less browser get. -->
+    <h1 class="sr">Everywhere</h1>
+
+    <div class="hero__foot">
+      <p class="hero__tagline" data-intro>
+        Two hundred thousand coloured points, one float texture,<br>
+        and a scroll bar. Move the cursor. Then scroll, hard.
+      </p>
+
+      <nav class="hero__index" aria-label="What's in the build" data-intro>
+        <ul>
+          <li><a href="#scenes">Atlas</a></li>
+          <li><a href="#scenes">Scatter</a></li>
+          <li><a href="#scenes">Stagger</a></li>
+        </ul>
+        <ul>
+          <li><a href="#index">Fluid field</a></li>
+          <li><a href="#index">Light</a></li>
+          <li><a href="#index">Tiers</a></li>
+        </ul>
+        <ul>
+          <li><a href="#index">Motion</a></li>
+          <li><a href="https://github.com/Memo-Es/point-cloud-playground">Source</a></li>
+        </ul>
+      </nav>
+    </div>
+  </section>
+
+  <!-- 1 ─────────────────────────────────────────────────────── dissolve -->
+  <section class="s s--center" data-scene="dissolve">
+    <div class="wrap narrow" data-reveal>
+      <h2>Formation is a lie the shader tells for a moment.</h2>
+      <p>
+        Every shape on this page is the same two hundred thousand points. A
+        letter, a sphere, a wave — nothing is ever created or destroyed, only
+        sent somewhere else. The transition is the subject.
+      </p>
+    </div>
+  </section>
+
+  <!-- 2 ─────────────────────────────────────────────────────────── reach -->
+  <section class="s s--right" id="scenes" data-scene="sphere">
+    <div class="wrap col" data-reveal>
+      <span class="num">01</span>
+      <h2>One field, not three effects</h2>
+      <p>
+        Cursor position, cursor speed and scroll velocity feed a single shared
+        field. The points read it, the light shafts read it, the bloom reads
+        it. Three things reacting to one source behave like a material.
+        Three things each smoothing their own copy of the mouse behave like
+        three gimmicks stacked on a page.
+      </p>
+    </div>
+  </section>
+
+  <!-- 3 ────────────────────────────────────────────────────────── depth -->
+  <section class="s s--left" data-scene="panels">
+    <div class="wrap col" data-reveal>
+      <span class="num">02</span>
+      <h2>Parallax you don't have to fake</h2>
+      <p>
+        These slabs sit at genuinely different depths, so the camera does the
+        parallax for free. The copy holds still while the world keeps moving,
+        because the camera interpolates continuously and the cloud does not —
+        it waits, formed, until you're most of the way through a section.
+      </p>
+    </div>
+  </section>
+
+  <!-- 4 ─────────────────────────────────────────────────────────── motion -->
+  <section class="s s--center" data-scene="wave">
+    <div class="wrap col narrow" data-reveal>
+      <span class="num">03</span>
+      <h2>Scroll is not an event stream</h2>
+      <p>
+        Scroll writes numbers into one plain object. The render loop reads
+        that object. Nothing re-renders, nothing re-lays-out, and the canvas
+        never drifts a frame behind the text sitting on top of it.
+      </p>
+    </div>
+  </section>
+
+  <!-- 5 ─────────────────────────────────────────── word / the index -->
+  <section class="s s--index" id="index" data-scene="word">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>What's in the build</p>
+      <ul class="index">
+        <li data-reveal><span>Point atlas</span><em>All seven target shapes packed into one float texture. A transition costs two uniform writes, not a multi-megabyte upload mid-scroll.</em></li>
+        <li data-reveal><span>Scatter &amp; reform</span><em>A burst curve that is zero at both ends, so points land exactly on target no matter how far they fly.</em></li>
+        <li data-reveal><span>Per-point stagger</span><em>Each point leaves at its own moment. Without it the cloud moves like a slab.</em></li>
+        <li data-reveal><span>Fluid field</span><em>One smoothed source of disturbance, shared by every layer.</em></li>
+        <li data-reveal><span>Volumetric light</span><em>Additive gradient quads at staggered depths, sheared by the same field.</em></li>
+        <li data-reveal><span>Four GPU tiers</span><em>Chosen at boot from hardware signals, dropped live if the frame budget is missed.</em></li>
+        <li data-reveal><span>Reduced motion</span><em>Honoured automatically, and overridable by a visible control.</em></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6 ──────────────────────────────────────────────────────────── outro -->
+  <section class="s s--center s--outro" data-scene="outro">
+    <div class="wrap narrow" data-reveal>
+      <h2 class="sr">A technique study</h2>
+      <p class="lede">
+        Open <code>src/js/config.js</code>. Every number that shapes this page
+        is in that one file, and nothing else in it is logic.
+      </p>
+      <p class="fine">
+        A reconstruction of a technique, built to be taken apart. Inspired by
+        the engineering behind Shopify Editions Spring&nbsp;’26; no Shopify
+        code, copy or assets are used here.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<p class="nogl">
+  This page renders an animated point cloud with WebGL, which your browser
+  couldn't start. The writing above is the whole argument — you aren't
+  missing any information, only the atmosphere.
+</p>
+
+<script type="module" src="./src/js/main.js"></script>
+</body>
+</html>
