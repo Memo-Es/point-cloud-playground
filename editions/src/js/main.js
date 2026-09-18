@@ -54,7 +54,8 @@ async function boot() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 140);
-  camera.position.set(0, 0, TUNING.cameraZ);
+  camera.position.set(0, 0, STATE.zoom);
+  let camDist = STATE.zoom;
 
   // The group carries rotation, so orbiting never touches point data.
   const group = new THREE.Group();
@@ -183,6 +184,17 @@ async function boot() {
   frame.addEventListener('pointerup', endDrag);
   frame.addEventListener('pointercancel', endDrag);
 
+  /* Wheel zoom. Multiplicative rather than additive, so a notch feels the
+     same whether you are close in or far out — an additive step is glacial
+     at distance and violent up close. Not passive, because the page must not
+     scroll underneath the stage. */
+  frame.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const k = Math.exp(e.deltaY * 0.0012);
+    STATE.zoom = Math.min(TUNING.zoomMax, Math.max(TUNING.zoomMin, STATE.zoom * k));
+    ui?.syncZoom();
+  }, { passive: false });
+
   /* ---- resize ----------------------------------------------------------- */
   function resize() {
     const w = Math.max(1, frame.clientWidth);
@@ -288,6 +300,14 @@ async function boot() {
        the cloud is loose, 1 once it has become the target. */
     const pose = STATE.transformed ? morphT : 1 - morphT;
     band.update(time, fluid.state, motion, pose);
+
+    /* Camera distance: the rest zoom, dollied toward `zoomOn` by the same
+       pose the band uses, plus a slow breathe on top. Damped rather than set
+       directly, so wheel notches and the transform never fight each other. */
+    const wantDist = THREE.MathUtils.lerp(STATE.zoom, STATE.zoomOn, pose)
+                   + Math.sin(time * STATE.breatheSpeed * Math.PI * 2) * STATE.breathe * motion;
+    camDist += (wantDist - camDist) * (1 - Math.pow(1 - TUNING.zoomEase, dt * 60));
+    camera.position.z = camDist;
 
     /* Tilting motion on the result. Two incommensurate frequencies so it
        never settles into an obvious loop, and scaled by `pose` so the loose

@@ -105,6 +105,15 @@ export const STATE = {
   bandStrength: 0.6,
   bandColor: '#FFFFFF',
 
+  /* Camera. `zoom` is the resting distance; `zoomOn` is where it dollies to
+     once the cloud has transformed, so the push-in is part of the gesture
+     rather than a separate thing you have to trigger. `breathe` is a slow
+     continuous in-out on top of both. */
+  zoom: 11,
+  zoomOn: 8,
+  breathe: 0.6,
+  breatheSpeed: 0.18,
+
   // Interaction
   force: 0.9,
   radius: 0.36,
@@ -139,6 +148,9 @@ export const TUNING = {
   flowSpeed: 0.22,
   pointerEase: 0.09,
   cameraZ: 11,
+  zoomEase: 0.07,      // how hard the camera resists a change in distance
+  zoomMin: 3,
+  zoomMax: 30,
   densityReference: 90000,
 };
 

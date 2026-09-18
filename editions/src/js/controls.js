@@ -165,6 +165,11 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     ['c-thick',   'v-thick',   'thickness',    (v) => v.toFixed(2),               onTarget, false, 180],
     ['c-drift',   'v-drift',   'drift',        (v) => v.toFixed(2),               onLive],
 
+    ['c-zoom',    'v-zoom',    'zoom',         (v) => v.toFixed(1),               onLive],
+    ['c-zoomon',  'v-zoomon',  'zoomOn',       (v) => v.toFixed(1),               onLive],
+    ['c-breathe', 'v-breathe', 'breathe',      (v) => v.toFixed(2),               onLive],
+    ['c-breaths', 'v-breaths', 'breatheSpeed', (v) => v.toFixed(2),               onLive],
+
     ['c-force',   'v-force',   'force',        (v) => v.toFixed(2),               onLive],
     ['c-radius',  'v-radius',  'radius',       (v) => v.toFixed(2),               onLive],
     ['c-glow',    'v-glow',    'glow',         (v) => v.toFixed(2),               onLive],
@@ -331,8 +336,17 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     return JSON.stringify(rest, null, 2);
   }
 
+  /* The wheel writes STATE.zoom directly, so the slider has to be told. */
+  function syncZoom() {
+    const el = $('c-zoom'), out = $('v-zoom');
+    if (!el) return;
+    el.value = STATE.zoom;
+    out.textContent = STATE.zoom.toFixed(1);
+  }
+
   return {
     setTransformLabel,
+    syncZoom,
     /* main wires the live repeat count in so the readout can show it. */
     setRepeatProbe(fn) { repeatProbe = fn; updateRepeatUI(); },
     updateRepeatUI,

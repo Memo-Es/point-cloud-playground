@@ -216,6 +216,29 @@
       </div>
     </div>
 
+    <!-- ── Camera ─────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">Camera</div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Zoom</span><span class="field-value" id="v-zoom"></span></div>
+        <input type="range" id="c-zoom" min="3" max="30" step="0.1">
+        <p class="field-note">Resting distance. Scrolling the stage moves this too.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Zoom on transform</span><span class="field-value" id="v-zoomon"></span></div>
+        <input type="range" id="c-zoomon" min="3" max="30" step="0.1">
+        <p class="field-note">Where the camera dollies to once the cloud has changed — below Zoom pushes in, above pulls out.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Breathe</span><span class="field-value" id="v-breathe"></span></div>
+        <input type="range" id="c-breathe" min="0" max="4" step="0.05">
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Breathe speed</span><span class="field-value" id="v-breaths"></span></div>
+        <input type="range" id="c-breaths" min="0.02" max="1" step="0.01">
+      </div>
+    </div>
+
     <!-- ── Interaction ────────────────────────────────────────── -->
     <div class="section">
       <div class="section-label">Interaction</div>
