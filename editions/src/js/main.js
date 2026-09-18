@@ -260,9 +260,9 @@ async function boot() {
     /* The words belong to the hero and leave with it. Driven off absolute
        scroll progress rather than the per-section morph, so they fade once
        and don't reappear on the way back up through later sections. */
-    const reveal = 1 - Math.min(1, Math.max(0, s.progress / CONFIG.wordLayer.fadeEnd));
+    const reveal = 1 - Math.min(1, Math.max(0, s.progress / CONFIG.wordRing.fadeEnd));
     words.update(time, f, app.motion, reveal * cloud.uniforms.uIntro.value,
-                 s.progress, camera);
+                 s.progress);
 
     if (composer) composer.render();
     else renderer.render(scene, camera);

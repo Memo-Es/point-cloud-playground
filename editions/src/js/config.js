@@ -104,31 +104,41 @@ export const CONFIG = {
     worldWidth: 15.5,
   },
 
-  /* --- The floating type --------------------------------------------------
-     The words ride a ring around the viewer. Rotating each plane by its own
-     orbit angle points it radially outward, so a word at the back is seen
-     FROM BEHIND — the mirroring is geometry, not a flipped texture, which is
-     why it survives the words moving.                                     */
-  wordLayer: {
-    orbit: {
-      center: [0, 0.40, -0.9],
-      radius: 3.6,
-      speed: 0.055,
-      scrollSpeed: 2.10,
-      tilt: 7,
-      wobble: 0.55,
-    },
-    drift: 0.10,
-    parallax: 0.55,
-    scrollLag: 0.22,
-    fadeEnd: 0.92,
-    instances: [
-      { angle:   0, height:  0.30, size: 0.62, opacity: 1.00, depthGain: 1.00, spin: -2 },
-      { angle:  58, height:  0.55, size: 0.58, opacity: 0.95, depthGain: 0.90, spin:  4 },
-      { angle: 119, height: -0.65, size: 0.50, opacity: 0.88, depthGain: 0.70, spin: -6, radius: 4.4 },
-      { angle: 176, height:  0.15, size: 0.66, opacity: 1.00, depthGain: 1.05, spin:  3 },
-      { angle: 236, height: -0.35, size: 0.44, opacity: 0.80, depthGain: 0.55, spin:  8, radius: 5.0 },
-      { angle: 298, height:  0.85, size: 0.40, opacity: 0.70, depthGain: 0.45, spin: -5, radius: 4.7 },
-    ],
+  /* --- The word band ------------------------------------------------------
+     One continuous stripe of type wrapped around a cylinder. `tilt` is how the
+     ring leans, in degrees — this is the control with the most effect on the
+     whole composition. `repeats` is how many times the word goes around.   */
+  wordRing: {
+    /* Deliberately larger than the frame. The band should run off the edges
+       rather than sit politely inside them — a ring you can see all of reads
+       as a logo, a ring that leaves the frame reads as something you are
+       standing inside. */
+    /* Sized from the frustum, not by eye. At `center` the visible half-width
+       is about 6 world units, so a radius a shade under that puts the ring's
+       widest point right at the frame edge — words run off the sides while
+       the near arc stays fully readable. */
+    radius:      6.0,
+    bandHeight:  2.8,    // world units tall — the cap height of the type
+    repeats:     3,      // fewer tiles = each word occupies more of the arc
+    gap:         0.22,   // trailing space per tile, as a fraction of the word
+    segments:    220,    // around the circumference. Low values facet the arc.
+    center:      [0, 0.20,  1.0],
+    /* Tilt is measured from the band's axis being VERTICAL, so small numbers
+       give a steeply-seen ring (a wide flat sweep) and numbers near -90 point
+       the axis at the camera and give a full circle. -35 puts the eye about
+       35 degrees above the ring's plane: the near arc runs across the lower
+       frame at full size, the far arc arcs overhead, and you read both. */
+    tilt:        [-35, 0, 8],   // degrees [x, y, z]
+    /* The camera looks into the tube, so the wall facing us is the INSIDE of
+       the cylinder and every word comes out backwards. Flipping the texture
+       horizontally puts the readable face where you actually look; the far
+       wall stays mirrored, which is the effect we wanted anyway. */
+    mirror:      true,
+    speed:       0.045,  // idle turn, radians/sec
+    scrollSpeed: 2.2,    // radians per section scrolled — the main driver
+    parallax:    0.9,    // how much the band leans toward the cursor
+    scrollLag:   0.25,
+    drift:       0.10,
+    fadeEnd:     0.92,   // fraction of section 0 after which it's gone
   },
 };

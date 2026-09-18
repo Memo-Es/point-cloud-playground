@@ -1,125 +1,113 @@
 /* ============================================================================
-   word-layer.js — crisp type suspended inside the cloud
+   word-layer.js — the word as a 3D band
 
-   The single biggest thing a first pass at this effect gets wrong: making the
-   headline out of points. The reference doesn't. Its type stays sharp vector
-   lettering and is placed *inside* the volume — repeated, mirrored, rotated,
-   at several depths — so the cloud reads as weather the type is standing in,
-   rather than as a material the type is made of.
+   The reference is one continuous stripe of type wrapped around a cylinder,
+   not a set of flat signs placed on a circle. That distinction is the whole
+   look: on a real cylinder the LETTERS themselves curve along the arc, and
+   the mirrored copies you see are just the inside of the band showing through
+   from behind.
 
-   That also means the type never has to fight the point budget for
-   legibility, which is why it can stay this large and this thin.
+   An earlier version here used flat quads at angles on a ring. It produced
+   mirrored words, but they read as floating cards because each one stayed
+   flat — no amount of positioning fixes that, because the curvature is the
+   thing your eye is reading.
 
-   Each instance is a textured quad sharing one canvas texture. They are drawn
-   after the points with depth testing off, so ordering is explicit and there
-   is no sorting cost.
+   So: an open-ended cylinder, the word tiled around its circumference with
+   RepeatWrapping, rendered DoubleSide. The mirroring then costs nothing — the
+   back faces of a cylinder ARE the inside, seen in reverse.
    ========================================================================= */
 
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
-const _c = new THREE.Vector3();   // scratch, to keep the loop allocation-free
-
 export function createWordLayer() {
-  const W = CONFIG.words;
-  const group = new THREE.Group();
-  const instances = [];
+  const R = CONFIG.wordRing;
+  const group = new THREE.Group();     // carries the tilt
+  const spinner = new THREE.Group();   // spins on the band's own axis
+  group.add(spinner);
 
-  const texture = makeWordTexture(W.hero);
-  if (!texture) return { group, instances, update() {}, dispose() {} };
+  const texture = makeWordTexture(CONFIG.words.hero);
+  if (!texture) return { group, update() {}, dispose() {} };
 
-  const aspect = texture.image.width / texture.image.height;
-  const geometry = new THREE.PlaneGeometry(1, 1);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  // A negative repeat mirrors the map, which is cheaper and sharper than
+  // re-drawing the glyphs flipped into the canvas.
+  texture.repeat.set(R.mirror ? -R.repeats : R.repeats, 1);
 
-  for (const spec of CONFIG.wordLayer.instances) {
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      opacity: spec.opacity,
-      /* The points write depth now, so the type can simply be depth-tested
-         against them: anything nearer than a letter erodes it. That eaten,
-         half-dissolved type is exactly what the reference shows, and it
-         falls out of the depth buffer rather than being faked. */
-      depthTest: true,
-      depthWrite: false,
-      // Both faces, because half the ring is seen from behind — that IS the
-      // mirroring, and culling backfaces would delete it.
-      side: THREE.DoubleSide,
-      toneMapped: false,
-    });
+  const geometry = new THREE.CylinderGeometry(
+    R.radius, R.radius, R.bandHeight,
+    R.segments, 1,
+    true,            // open-ended: a band, not a drum
+  );
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.scale.set(spec.size * aspect, spec.size, 1);
-    mesh.frustumCulled = false;
-    group.add(mesh);
-    instances.push({ mesh, spec, baseOpacity: spec.opacity });
-  }
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    /* alphaTest turns the glyphs into a depth-writing cutout, which is what
+       makes the near arc correctly cover the far one. Without it the two
+       halves of the band blend into each other wherever they cross. */
+    alphaTest: 0.35,
+    depthTest: true,
+    depthWrite: true,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 4;
+  spinner.add(mesh);
+
+  /* Tilt lives on the parent so that spinning is always around the band's own
+     axis. Putting both on one object makes the two rotations fight, and the
+     band wobbles instead of turning. */
+  group.rotation.set(
+    THREE.MathUtils.degToRad(R.tilt[0]),
+    THREE.MathUtils.degToRad(R.tilt[1]),
+    THREE.MathUtils.degToRad(R.tilt[2]),
+  );
+  group.position.set(...R.center);
 
   return {
     group,
-    instances,
+    mesh,
+    material,
 
-    /* `reveal` fades the layer as the hero leaves. `scrollProgress` turns
-       the ring — scrolling is the primary driver; idle rotation is a slow
-       secondary so the piece is alive before anyone touches it. */
-    update(time, fluid, motion, reveal, scrollProgress, camera) {
-      const D = CONFIG.wordLayer;
-      const O = D.orbit;
-      const tiltRad = THREE.MathUtils.degToRad(O.tilt);
-      const spin = time * O.speed * motion + scrollProgress * O.scrollSpeed;
+    update(time, fluid, motion, reveal, scrollProgress) {
+      material.opacity = reveal;
+      mesh.visible = reveal > 0.004;
+      if (!mesh.visible) return;
 
-      for (let i = 0; i < instances.length; i++) {
-        const { mesh, spec, baseOpacity } = instances[i];
+      // Scroll is the primary driver; the idle turn only keeps it alive
+      // before anyone touches the page.
+      spinner.rotation.y = time * R.speed * motion + scrollProgress * R.scrollSpeed;
 
-        mesh.material.opacity = baseOpacity * reveal;
-        mesh.visible = mesh.material.opacity > 0.004;
-        if (!mesh.visible) continue;
-
-        const a = THREE.MathUtils.degToRad(spec.angle) + spin;
-        const r = spec.radius ?? O.radius;
-        const phase = i * 1.7;
-
-        const x = O.center[0] + Math.sin(a) * r;
-        const z = O.center[2] + Math.cos(a) * r;
-        // Wobble is keyed to the orbit angle, not to time, so a word sways
-        // the same way every time it comes round — the motion reads as the
-        // shape of the ring rather than as noise.
-        const y = O.center[1] + spec.height
-                + Math.sin(a * 2) * O.wobble * 0.25
-                + Math.sin(time * 0.31 + phase) * D.drift * motion;
-
-        mesh.position.set(
-          x + fluid.pointer.x * D.parallax * spec.depthGain * fluid.activation,
-          y + fluid.pointer.y * D.parallax * 0.55 * spec.depthGain * fluid.activation
-            - fluid.scrollVel * D.scrollLag * spec.depthGain * motion,
-          z,
-        );
-
-        /* Rotating by the orbit angle points each plane radially outward, so
-           it reads correctly at the front of the ring and mirrored at the
-           back. That single line is the whole effect. */
-        mesh.rotation.set(tiltRad * Math.cos(a), a, THREE.MathUtils.degToRad(spec.spin ?? 0));
-
-        // Depth testing handles occlusion; render order only needs to put
-        // the type after the cloud so the buffer is already populated.
-        mesh.renderOrder = 4;
-      }
+      // The whole band leans toward the cursor, which sells its depth far
+      // more cheaply than moving the camera.
+      group.rotation.x = THREE.MathUtils.degToRad(R.tilt[0])
+                       + fluid.pointer.y * R.parallax * 0.25 * fluid.activation * motion;
+      group.rotation.z = THREE.MathUtils.degToRad(R.tilt[2])
+                       + fluid.pointer.x * R.parallax * 0.18 * fluid.activation * motion;
+      group.position.y = R.center[1]
+                       - fluid.scrollVel * R.scrollLag * motion
+                       + Math.sin(time * 0.21) * R.drift * motion;
     },
 
     dispose() {
       geometry.dispose();
       texture.dispose();
-      instances.forEach(({ mesh }) => mesh.material.dispose());
+      material.dispose();
     },
   };
 }
 
-/* Rasterise the word once, at a size generous enough that the largest
-   instance is still sampling down rather than up. */
+/* One tile of the band: the word plus trailing space, so tiling it around the
+   circumference reads as continuous rather than as words jammed together. */
 function makeWordTexture(text) {
   const T = CONFIG.text;
-  const FS = 300;
-  const pad = Math.round(FS * 0.22);
+  const R = CONFIG.wordRing;
+  const FS = 256;
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -127,12 +115,14 @@ function makeWordTexture(text) {
 
   ctx.font = font;
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${T.tracking}em`;
-  const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
-  const h = Math.ceil(FS * 1.3);
-  if (!(w > 0 && h > 0)) return null;
+  const textW = Math.ceil(ctx.measureText(text).width);
+  if (!textW) return null;
 
+  const w = Math.ceil(textW * (1 + R.gap));
+  const h = Math.ceil(FS * 1.35);
   canvas.width = w; canvas.height = h;
-  ctx.font = font;                       // resizing resets the 2D state
+
+  ctx.font = font;                 // resizing the canvas resets 2D state
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${T.tracking}em`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -143,8 +133,9 @@ function makeWordTexture(text) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = 8;      // these quads are seen at a slant; without this
-                           // the rotated instances go to mush
+  // The band is seen at a hard slant almost everywhere; without anisotropy
+  // the far side of it turns to mush.
+  tex.anisotropy = 8;
   tex.generateMipmaps = true;
   tex.needsUpdate = true;
   return tex;
