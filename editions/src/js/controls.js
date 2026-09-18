@@ -9,7 +9,7 @@
      count  — reallocate the point buffers
    ========================================================================= */
 
-import { TARGETS, PALETTES, COLOR_MODES, EFFECTS, STATE } from './config.js';
+import { TARGETS, PALETTES, COLOR_MODES, EFFECTS, ON_TRANSFORM, STATE } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -89,6 +89,34 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     bandRow.appendChild(b);
   });
 
+  /* ---- small chip-row helper ------------------------------------------- */
+  function chipRow(rowId, items, getVal, setVal, cb) {
+    const row = $(rowId);
+    if (!row) return () => {};
+    items.forEach((it) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = it.label;
+      b.dataset.val = String(it.id);
+      b.className = 'select-chip' + (String(it.id) === String(getVal()) ? ' active' : '');
+      b.addEventListener('click', () => { setVal(it.id); sync(); cb(); });
+      row.appendChild(b);
+    });
+    function sync() {
+      [...row.children].forEach((c) => c.classList.toggle('active', c.dataset.val === String(getVal())));
+    }
+    return sync;
+  }
+
+  /* ---- repeat mode ------------------------------------------------------ */
+  const syncAuto = chipRow('bandauto-row',
+    [{ id: true, label: 'Auto' }, { id: false, label: 'Manual' }],
+    () => STATE.bandAuto, (v) => { STATE.bandAuto = v; }, () => { updateRepeatUI(); onBand(); });
+
+  /* ---- what the band does on transform ---------------------------------- */
+  chipRow('ontransform-row', ON_TRANSFORM,
+    () => STATE.bandOnTransform, (v) => { STATE.bandOnTransform = v; }, onLive);
+
   /* ---- band effect ----------------------------------------------------- */
   const fxRow = $('effect-row');
   EFFECTS.forEach((e) => {
@@ -114,10 +142,14 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     ['c-morph',   'v-morph',   'morphTime',    (v) => v.toFixed(2) + ' s',        onLive],
     ['c-scatter', 'v-scatter', 'scatter',      (v) => v.toFixed(1),               onLive],
     ['c-stagger', 'v-stagger', 'stagger',      (v) => v.toFixed(2),               onLive],
+    ['c-tdepth',  'v-tdepth',  'textDepth',    (v) => v.toFixed(2),               onTarget, false, 180],
+    ['c-tilta',   'v-tilta',   'tiltAmount',   (v) => v.toFixed(2),               onLive],
+    ['c-tilts',   'v-tilts',   'tiltSpeed',    (v) => v.toFixed(2),               onLive],
 
     ['c-bandd',   'v-bandd',   'bandDiameter', (v) => v.toFixed(1),               onBand],
     ['c-bandh',   'v-bandh',   'bandHeight',   (v) => v.toFixed(2),               onBand],
-    ['c-bandr',   'v-bandr',   'bandRepeats',  (v) => String(v),                  onBand, true, 150],
+    ['c-bandr',   'v-bandr',   'bandRepeats',    (v) => String(v),                onBand, true, 150],
+    ['c-bandls',  'v-bandls',  'bandLetterSize', (v) => v.toFixed(2) + '\u00d7',   onBand],
     ['c-bandt',   'v-bandt',   'bandTilt',     (v) => v.toFixed(0) + '°',    onBand],
     ['c-bands',   'v-bands',   'bandSpeed',    (v) => v.toFixed(2),               onLive],
     ['c-bandfx',  'v-bandfx',  'bandStrength', (v) => v.toFixed(2),               onBand],
@@ -151,6 +183,22 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
       fire();
     });
   }
+
+  /* In auto mode the slider is inert and the readout shows what the geometry
+     actually resolved to, which is the number people want to see. */
+  let repeatProbe = () => STATE.bandRepeats;
+  function updateRepeatUI() {
+    const auto = STATE.bandAuto;
+    $('c-bandr').disabled = auto;
+    $('c-bandr').parentElement.classList.toggle('is-muted', auto);
+    $('lettersize-field').style.display = auto ? '' : 'none';
+    $('note-bandr').textContent = auto
+      ? 'Auto derives the count from the circumference, so letters keep their proportions as the diameter changes.'
+      : 'Fixed count. Letters stretch or squeeze as the diameter changes.';
+    $('v-bandr').textContent = String(repeatProbe());
+  }
+  updateRepeatUI();
+  syncAuto();
 
   /* ---- palette --------------------------------------------------------- */
   const palRow = $('palette-row');
@@ -283,7 +331,12 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     return JSON.stringify(rest, null, 2);
   }
 
-  return { setTransformLabel };
+  return {
+    setTransformLabel,
+    /* main wires the live repeat count in so the readout can show it. */
+    setRepeatProbe(fn) { repeatProbe = fn; updateRepeatUI(); },
+    updateRepeatUI,
+  };
 }
 
 function debounce(fn, ms) {

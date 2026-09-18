@@ -42,6 +42,11 @@ export const EFFECTS = [
 ];
 export const EFFECT_IDS = { solid: 0, irid: 1, chroma: 2, refract: 3 };
 
+export const ON_TRANSFORM = [
+  { id: 'flatten', label: 'Flatten on top' },
+  { id: 'stay',    label: 'Stay' },
+];
+
 export const STATE = {
   /* The one transformation. The cloud is the rest state; firing the trigger
      sends it to `target`, firing again brings it back. */
@@ -66,16 +71,30 @@ export const STATE = {
   scatter: 4.2,
   stagger: 0.58,
 
+  /* The result, once transformed. `textDepth` extrudes the text target into a
+     slab; tilt rocks the whole result so a 3D form reads as one. */
+  textDepth: 0.55,
+  tiltAmount: 0.22,
+  tiltSpeed: 0.35,
+
   // The word band — rest pose
   bandOn: true,
   bandDiameter: 12.0,
   bandHeight: 2.8,
   bandRepeats: 3,
+  /* Auto derives the repeat count from the circumference, so letters keep
+     their proportions when you change the diameter instead of stretching. */
+  bandAuto: true,
+  bandLetterSize: 1.0,
   bandTilt: -35,
   bandSpeed: 0.12,
 
-  /* Transformed pose. The band flattens (tilt toward 0 stands the ring up
-     level) and lifts clear of whatever the cloud became. */
+  /* What the band does when the cloud transforms:
+       flatten — lay it level and lift it over the result
+       stay    — hold the rest pose and let the cloud change under it */
+  bandOnTransform: 'flatten',
+
+  /* The flattened pose itself. */
   bandDiameterOn: 9.0,
   bandHeightOn: 1.2,
   bandTiltOn: -4,

@@ -181,7 +181,7 @@ const GENERATORS = {
   /* Text is rasterised to an offscreen canvas and sampled where the glyphs
      cover pixels. Must run after document.fonts.ready or the sampler reads
      the fallback font and the word comes out the wrong shape. */
-  text(count, { thickness = 0, text = 'HELLO', fontFamily = "'Inter', sans-serif", seed = 77 } = {}) {
+  text(count, { thickness = 0, text = 'HELLO', fontFamily = "'Inter', sans-serif", seed = 77, depth = 0.5 } = {}) {
     const rand = rng(seed);
     const out = new Float32Array(count * 3);
     const str = (text || '').trim() || 'HELLO';
@@ -216,7 +216,10 @@ const GENERATORS = {
       const p = ((rand() * n) | 0) * 2;
       out[i * 3] = (lit[p] + rand() - 0.5 - w / 2) * scale;
       out[i * 3 + 1] = -(lit[p + 1] + rand() - 0.5 - h / 2) * scale;
-      out[i * 3 + 2] = (rand() - 0.5) * R * 0.14;
+      /* A real slab, not a decal. The old 0.14 gave a sheet of points that
+         vanished edge-on the moment anything rotated; `depth` extrudes the
+         glyphs so the word has a front and a back to turn between. */
+      out[i * 3 + 2] = (rand() - 0.5) * R * depth;
       puff(out, i, rand, thickness, R * 0.16);
     }
     return out;

@@ -69,14 +69,21 @@ async function boot() {
     thickness: STATE.thickness,
     text: STATE.cloudText,
     fontFamily: fontStack(),
+    depth: STATE.textDepth,
   });
+
+  /* The cloud gets its own pivot inside the group. Tilting the RESULT should
+     rock the point cloud, not the band — sharing one transform would swing
+     both and lose the contrast between them. */
+  const cloudPivot = new THREE.Group();
+  group.add(cloudPivot);
 
   let cloud = createPointCloud({
     count: STATE.count,
     positions: restPositions(),
     pixelRatio: dpr(),
   });
-  group.add(cloud.mesh);
+  cloudPivot.add(cloud.mesh);
 
   const band = createWordBand();
   group.add(band.group);
@@ -121,14 +128,14 @@ async function boot() {
   }
 
   function rebuild() {
-    group.remove(cloud.mesh);
+    cloudPivot.remove(cloud.mesh);
     cloud.dispose();
     cloud = createPointCloud({
       count: STATE.count,
       positions: STATE.transformed ? targetPositions() : restPositions(),
       pixelRatio: dpr(),
     });
-    group.add(cloud.mesh);
+    cloudPivot.add(cloud.mesh);
     morphT = 1; morphing = false;
     applyLive();
     metaPoints.textContent = STATE.count.toLocaleString();
@@ -203,13 +210,14 @@ async function boot() {
     onTarget: retarget,
     onCount: rebuild,
     onLive: applyLive,
-    onBand: () => band.refresh(),
+    onBand: () => { band.refresh(); ui?.updateRepeatUI(); },
     onAction: (name) => {
       if (name === 'transform') fire();
       if (name === 'randomise') { if (!STATE.transformed) fire(); else retarget(); }
     },
     onExport: exportImage,
   });
+  ui.setRepeatProbe(() => band.effectiveRepeats());
   applyLive();
 
   /* ---- export ----------------------------------------------------------- */
@@ -280,6 +288,13 @@ async function boot() {
        the cloud is loose, 1 once it has become the target. */
     const pose = STATE.transformed ? morphT : 1 - morphT;
     band.update(time, fluid.state, motion, pose);
+
+    /* Tilting motion on the result. Two incommensurate frequencies so it
+       never settles into an obvious loop, and scaled by `pose` so the loose
+       cloud stays still and only the formed shape rocks. */
+    const rock = STATE.tiltAmount * pose * motion;
+    cloudPivot.rotation.x = Math.sin(time * STATE.tiltSpeed) * rock;
+    cloudPivot.rotation.y = Math.cos(time * STATE.tiltSpeed * 0.73) * rock * 1.5;
 
     // Drag decays into rest rather than snapping back, so the two never fight.
     spinVel.x *= 0.92;

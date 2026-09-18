@@ -83,6 +83,20 @@
         <div class="field-row"><span class="field-name">Trail</span><span class="field-value" id="v-stagger"></span></div>
         <input type="range" id="c-stagger" min="0" max="0.92" step="0.01">
       </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Text depth</span><span class="field-value" id="v-tdepth"></span></div>
+        <input type="range" id="c-tdepth" min="0" max="2" step="0.02">
+        <p class="field-note">Extrudes the Text target into a slab, so it has a front and a back to turn between.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Tilt motion</span><span class="field-value" id="v-tilta"></span></div>
+        <input type="range" id="c-tilta" min="0" max="0.7" step="0.01">
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Tilt speed</span><span class="field-value" id="v-tilts"></span></div>
+        <input type="range" id="c-tilts" min="0" max="1.5" step="0.01">
+        <p class="field-note">Rocks the result only — the band holds still, which is what makes the contrast read.</p>
+      </div>
     </div>
 
     <!-- ── Band ───────────────────────────────────────────────── -->
@@ -113,7 +127,13 @@
       </div>
       <div class="field">
         <div class="field-row"><span class="field-name">Repeats</span><span class="field-value" id="v-bandr"></span></div>
-        <input type="range" id="c-bandr" min="1" max="10" step="1">
+        <div class="select-row" id="bandauto-row" role="group" aria-label="Repeat mode" style="margin-bottom:10px"></div>
+        <input type="range" id="c-bandr" min="1" max="24" step="1">
+        <p class="field-note" id="note-bandr">Auto derives the count from the circumference, so letters keep their proportions as the diameter changes.</p>
+      </div>
+      <div class="field" id="lettersize-field">
+        <div class="field-row"><span class="field-name">Letter size</span><span class="field-value" id="v-bandls"></span></div>
+        <input type="range" id="c-bandls" min="0.3" max="3" step="0.02">
       </div>
       <div class="field">
         <div class="field-row"><span class="field-name">Tilt</span><span class="field-value" id="v-bandt"></span></div>
@@ -147,10 +167,11 @@
     <!-- ── Transformed pose ───────────────────────────────────── -->
     <div class="section">
       <div class="section-label">Band when transformed</div>
-      <p class="field-note" style="margin-top:0;margin-bottom:14px">
-        Where the band goes once the cloud has changed. It lerps between the two
-        poses on the same curve as the morph.
-      </p>
+      <div class="field">
+        <div class="field-row"><span class="field-name">On transform</span></div>
+        <div class="select-row" id="ontransform-row" role="group" aria-label="On transform"></div>
+        <p class="field-note">Flatten lays the band level and lifts it over the result. Stay holds the rest pose and lets the cloud change underneath.</p>
+      </div>
       <div class="field">
         <div class="field-row"><span class="field-name">Diameter</span><span class="field-value" id="v-bandd2"></span></div>
         <input type="range" id="c-bandd2" min="3" max="26" step="0.2">

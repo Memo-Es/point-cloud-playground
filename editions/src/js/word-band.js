@@ -33,6 +33,7 @@ export function createWordBand() {
   let builtText = null;
   let builtRepeats = null;
   let builtFont = null;
+  let texAspect = 4;      // canvas w/h of one tile, for auto repeat
 
   const uniforms = {
     uMap:        { value: null },
@@ -57,10 +58,11 @@ export function createWordBand() {
        the wall facing us is the cylinder's INSIDE and the type would come out
        backwards; flipping puts the readable face where you look and leaves
        the far wall mirrored, which is the effect we wanted anyway. */
-    texture.repeat.set(-STATE.bandRepeats, 1);
+    texture.repeat.set(-effectiveRepeats(), 1);
 
     uniforms.uMap.value = texture;
     uniforms.uTexel.value.set(1 / texture.image.width, 1 / texture.image.height);
+    texAspect = texture.image.width / texture.image.height;
 
     // Unit cylinder, scaled live — so diameter and height never rebuild.
     geometry = new THREE.CylinderGeometry(1, 1, 1, BAND.segments, 1, true);
@@ -81,6 +83,23 @@ export function createWordBand() {
     builtText = STATE.bandText;
     builtRepeats = STATE.bandRepeats;
     builtFont = fontFamily();
+  }
+
+  /* How many times the word fits around the band.
+
+     In auto mode this comes from the geometry rather than a slider: one tile
+     spans circumference/repeats horizontally and bandHeight vertically, so
+     repeats = circumference / (height x tileAspect) is the count at which the
+     glyphs are undistorted. `bandLetterSize` scales away from that on
+     purpose — bigger letters, fewer of them.
+
+     It is recomputed every frame because it is only a texture.repeat write:
+     changing the diameter never rebuilds anything. */
+  function effectiveRepeats() {
+    if (!STATE.bandAuto) return Math.max(1, Math.round(STATE.bandRepeats));
+    const circumference = Math.PI * Math.max(0.1, STATE.bandDiameter);
+    const tileW = Math.max(0.05, STATE.bandHeight) * texAspect * Math.max(0.2, STATE.bandLetterSize);
+    return Math.max(1, Math.round(circumference / tileW));
   }
 
   function fontFamily() {
@@ -113,19 +132,25 @@ export function createWordBand() {
     /* Rebuild only for things baked into the texture. Diameter, height, tilt,
        colour and effect are all live. */
     refresh() {
-      if (STATE.bandText !== builtText
-        || STATE.bandRepeats !== builtRepeats
-        || fontFamily() !== builtFont) build();
+      // Only the text and the typeface are baked in. The repeat count is a
+      // texture wrap, so it never needs a rebuild.
+      if (STATE.bandText !== builtText || fontFamily() !== builtFont) build();
       apply();
     },
     apply,
+    effectiveRepeats,
 
     /* `pose` is 0 at rest and 1 when the cloud has transformed. */
     update(time, fluid, motion, pose) {
       if (!mesh || !STATE.bandOn) return;
       uniforms.uTime.value = time;
 
-      const p = pose * pose * (3 - 2 * pose);   // ease it
+      if (texture) texture.repeat.x = -effectiveRepeats();
+
+      /* `stay` holds the rest pose and lets the cloud change underneath,
+         which is a different and often better read than the band moving too. */
+      const target = STATE.bandOnTransform === 'stay' ? 0 : pose;
+      const p = target * target * (3 - 2 * target);   // ease it
 
       // Diameter and height are a scale on the unit cylinder.
       const r = Math.max(0.1, THREE.MathUtils.lerp(STATE.bandDiameter, STATE.bandDiameterOn, p)) / 2;

@@ -447,3 +447,5 @@ pre.code-out {
   transition: all 140ms ease;
 }
 .file-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.4); }
+
+.is-muted input[type="range"] { opacity: 0.35; }
