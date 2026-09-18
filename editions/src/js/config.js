@@ -33,11 +33,25 @@ export const COLOR_MODES = [
   { id: 3, label: 'Random' },
 ];
 
+/* Band text treatments. The ids map to uMode in shaders/band.frag.js. */
+export const EFFECTS = [
+  { id: 'solid',   label: 'Solid'   },
+  { id: 'irid',    label: 'Iridescent' },
+  { id: 'chroma',  label: 'Chromatic'  },
+  { id: 'refract', label: 'Refract'    },
+];
+export const EFFECT_IDS = { solid: 0, irid: 1, chroma: 2, refract: 3 };
+
 export const STATE = {
   /* The one transformation. The cloud is the rest state; firing the trigger
      sends it to `target`, firing again brings it back. */
   target: 'text',
-  text: 'EVERYWHERE',
+  /* Two separate strings on purpose: what the POINTS spell and what the BAND
+     says are usually not the same thing. */
+  cloudText: 'EVERYWHERE',
+  bandText: 'EVERYWHERE',
+  /* Set when a font file is uploaded; empty means the built-in stack. */
+  fontName: '',
   transformed: false,
 
   // Cloud
@@ -52,13 +66,25 @@ export const STATE = {
   scatter: 4.2,
   stagger: 0.58,
 
-  // The word band
+  // The word band — rest pose
   bandOn: true,
   bandDiameter: 12.0,
   bandHeight: 2.8,
   bandRepeats: 3,
   bandTilt: -35,
   bandSpeed: 0.12,
+
+  /* Transformed pose. The band flattens (tilt toward 0 stands the ring up
+     level) and lifts clear of whatever the cloud became. */
+  bandDiameterOn: 9.0,
+  bandHeightOn: 1.2,
+  bandTiltOn: -4,
+  bandLift: 3.2,
+
+  // Band treatment
+  bandEffect: 'refract',
+  bandStrength: 0.6,
+  bandColor: '#FFFFFF',
 
   // Interaction
   force: 0.9,

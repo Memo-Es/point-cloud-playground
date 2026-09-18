@@ -61,10 +61,14 @@ async function boot() {
   scene.add(group);
 
   const restPositions = () => generate('cloud', STATE.count, { thickness: 1.0 });
+  const fontStack = () => (STATE.fontName
+    ? `"${STATE.fontName}", 'Inter', system-ui, sans-serif`
+    : "'Inter', system-ui, sans-serif");
+
   const targetPositions = () => generate(STATE.target, STATE.count, {
     thickness: STATE.thickness,
-    text: STATE.text,
-    fontFamily: "'Inter', system-ui, sans-serif",
+    text: STATE.cloudText,
+    fontFamily: fontStack(),
   });
 
   let cloud = createPointCloud({
@@ -78,6 +82,16 @@ async function boot() {
   group.add(band.group);
 
   const fluid = createFluidField(frame);
+
+  /* Refraction needs a picture of the scene WITHOUT the band, so the letters
+     have something real to bend. One extra pass, only while that effect is
+     selected. */
+  const sceneRT = new THREE.WebGLRenderTarget(1, 1, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    depthBuffer: true,
+  });
+  const bufSize = new THREE.Vector2();
 
   /* ---- the one transformation ------------------------------------------ */
   let morphT = 1;
@@ -171,6 +185,8 @@ async function boot() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     cloud.uniforms.uPixelRatio.value = dpr();
+    renderer.getDrawingBufferSize(bufSize);
+    sceneRT.setSize(Math.max(1, bufSize.x), Math.max(1, bufSize.y));
   }
   new ResizeObserver(resize).observe(frame);
   resize();
@@ -260,7 +276,10 @@ async function boot() {
       }
     }
 
-    band.update(time, fluid.state, motion);
+    /* The band's pose follows the transformation on the same curve: 0 while
+       the cloud is loose, 1 once it has become the target. */
+    const pose = STATE.transformed ? morphT : 1 - morphT;
+    band.update(time, fluid.state, motion, pose);
 
     // Drag decays into rest rather than snapping back, so the two never fight.
     spinVel.x *= 0.92;
@@ -268,6 +287,18 @@ async function boot() {
     group.rotation.y += spinVel.y;
     group.rotation.x += spinVel.x;
     group.rotation.x = Math.max(-1.2, Math.min(1.2, group.rotation.x));
+
+    if (STATE.bandOn && STATE.bandEffect === 'refract' && band.mesh) {
+      // Pass one: everything but the band, into a texture.
+      band.group.visible = false;
+      renderer.setRenderTarget(sceneRT);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      band.group.visible = true;
+      renderer.getDrawingBufferSize(bufSize);
+      band.uniforms.uScene.value = sceneRT.texture;
+      band.uniforms.uResolution.value.copy(bufSize);
+    }
 
     renderer.render(scene, camera);
   });

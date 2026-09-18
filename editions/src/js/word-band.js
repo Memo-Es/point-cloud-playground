@@ -1,20 +1,29 @@
 /* ============================================================================
    word-band.js — the word as a 3D band
 
-   One continuous stripe of type wrapped around a cylinder, not flat signs
-   placed on a circle. That distinction is the whole look: on a real cylinder
-   the LETTERS themselves curve along the arc, and the mirrored copies you see
-   are simply the inside of the band showing through from behind.
+   One continuous stripe of type wrapped around a cylinder, not flat signs on
+   a circle. On a real cylinder the LETTERS curve along the arc, and the
+   mirrored copies you see are simply the inside of the band showing through
+   from behind.
 
-   Everything here is rebuilt when the text changes and adjusted live
-   otherwise, so dragging the diameter slider never costs a rebuild.
+   Two things beyond that:
+
+   - The band has two POSES. At rest it rings the cloud at its tilt; when the
+     cloud transforms, the band flattens and lifts above the result. `pose`
+     lerps between them, driven by the same progress as the morph.
+
+   - The material is a shader, not a flat white map. See shaders/band.frag.js —
+     refraction, chromatic fringing and iridescence all work off the gradient
+     of the glyph alpha, which stands in for a surface normal.
    ========================================================================= */
 
 import * as THREE from 'three';
-import { STATE, BAND } from './config.js';
+import { STATE, BAND, EFFECT_IDS } from './config.js';
+import vertexShader from './shaders/band.vert.js';
+import fragmentShader from './shaders/band.frag.js';
 
 export function createWordBand() {
-  const group = new THREE.Group();     // carries the tilt
+  const group = new THREE.Group();     // carries the pose
   const spinner = new THREE.Group();   // spins on the band's own axis
   group.add(spinner);
 
@@ -23,37 +32,45 @@ export function createWordBand() {
   let mesh = null;
   let builtText = null;
   let builtRepeats = null;
+  let builtFont = null;
+
+  const uniforms = {
+    uMap:        { value: null },
+    uScene:      { value: null },
+    uTexel:      { value: new THREE.Vector2(1 / 1024, 1 / 256) },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+    uMode:       { value: EFFECT_IDS[STATE.bandEffect] ?? 3 },
+    uStrength:   { value: STATE.bandStrength },
+    uColor:      { value: new THREE.Color(STATE.bandColor) },
+    uOpacity:    { value: 1 },
+    uTime:       { value: 0 },
+  };
 
   function build() {
-    dispose();
+    disposeMesh();
 
-    texture = makeWordTexture(STATE.text);
+    texture = makeWordTexture(STATE.bandText, fontFamily());
     if (!texture) return;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
     /* A negative repeat mirrors the map. The camera looks into the tube, so
-       the wall facing us is the cylinder's INSIDE and the type would
-       otherwise come out backwards; flipping puts the readable face where
-       you actually look and leaves the far wall mirrored, which is the
-       effect we wanted anyway. */
+       the wall facing us is the cylinder's INSIDE and the type would come out
+       backwards; flipping puts the readable face where you look and leaves
+       the far wall mirrored, which is the effect we wanted anyway. */
     texture.repeat.set(-STATE.bandRepeats, 1);
 
-    geometry = new THREE.CylinderGeometry(
-      1, 1, 1,                 // unit cylinder — scaled live, so diameter and
-      BAND.segments, 1, true,  // height never trigger a rebuild
-    );
+    uniforms.uMap.value = texture;
+    uniforms.uTexel.value.set(1 / texture.image.width, 1 / texture.image.height);
 
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
+    // Unit cylinder, scaled live — so diameter and height never rebuild.
+    geometry = new THREE.CylinderGeometry(1, 1, 1, BAND.segments, 1, true);
+
+    const material = new THREE.ShaderMaterial({
+      uniforms, vertexShader, fragmentShader,
       transparent: true,
-      /* alphaTest makes the glyphs a depth-writing cutout, so the near arc
-         correctly covers the far one. Without it the two halves of the band
-         blend into each other wherever they cross. */
-      alphaTest: 0.35,
       depthTest: true,
       depthWrite: true,
       side: THREE.DoubleSide,
-      toneMapped: false,
     });
 
     mesh = new THREE.Mesh(geometry, material);
@@ -61,26 +78,25 @@ export function createWordBand() {
     mesh.renderOrder = 4;
     spinner.add(mesh);
 
-    builtText = STATE.text;
+    builtText = STATE.bandText;
     builtRepeats = STATE.bandRepeats;
+    builtFont = fontFamily();
   }
 
-  /* Cheap per-frame settings. Diameter and height are a scale, not geometry. */
+  function fontFamily() {
+    return STATE.fontName ? `"${STATE.fontName}", ${BAND.fontFamily}` : BAND.fontFamily;
+  }
+
+  /* Cheap per-frame settings. Nothing here rebuilds anything. */
   function apply() {
     if (!mesh) return;
-    const r = Math.max(0.1, STATE.bandDiameter / 2);
-    mesh.scale.set(r, Math.max(0.05, STATE.bandHeight), r);
-    mesh.material.opacity = 1;
-    /* Tilt is measured from the band's axis being VERTICAL. Small numbers
-       give a steeply-seen ring — a wide flat sweep — while numbers near -90
-       point the axis at the camera and flatten it into a circle. */
-    group.rotation.x = THREE.MathUtils.degToRad(STATE.bandTilt);
-    group.rotation.z = THREE.MathUtils.degToRad(BAND.roll);
-    group.position.set(...BAND.center);
+    uniforms.uMode.value = EFFECT_IDS[STATE.bandEffect] ?? 0;
+    uniforms.uStrength.value = STATE.bandStrength;
+    uniforms.uColor.value.set(STATE.bandColor);
     group.visible = STATE.bandOn;
   }
 
-  function dispose() {
+  function disposeMesh() {
     if (mesh) { spinner.remove(mesh); mesh.material.dispose(); mesh = null; }
     if (geometry) { geometry.dispose(); geometry = null; }
     if (texture) { texture.dispose(); texture = null; }
@@ -91,45 +107,68 @@ export function createWordBand() {
 
   return {
     group,
+    uniforms,
     get mesh() { return mesh; },
 
-    /* Rebuild only when something baked into the texture or geometry changed. */
+    /* Rebuild only for things baked into the texture. Diameter, height, tilt,
+       colour and effect are all live. */
     refresh() {
-      if (STATE.text !== builtText || STATE.bandRepeats !== builtRepeats) build();
+      if (STATE.bandText !== builtText
+        || STATE.bandRepeats !== builtRepeats
+        || fontFamily() !== builtFont) build();
       apply();
     },
     apply,
 
-    update(time, fluid, motion) {
+    /* `pose` is 0 at rest and 1 when the cloud has transformed. */
+    update(time, fluid, motion, pose) {
       if (!mesh || !STATE.bandOn) return;
+      uniforms.uTime.value = time;
+
+      const p = pose * pose * (3 - 2 * pose);   // ease it
+
+      // Diameter and height are a scale on the unit cylinder.
+      const r = Math.max(0.1, THREE.MathUtils.lerp(STATE.bandDiameter, STATE.bandDiameterOn, p)) / 2;
+      const h = Math.max(0.05, THREE.MathUtils.lerp(STATE.bandHeight, STATE.bandHeightOn, p));
+      mesh.scale.set(r, h, r);
+
       spinner.rotation.y = time * STATE.bandSpeed * motion;
-      // The band leans toward the cursor, which sells its depth far more
-      // cheaply than moving the camera.
-      group.rotation.x = THREE.MathUtils.degToRad(STATE.bandTilt)
+
+      /* Tilt is measured from the band's axis being VERTICAL: small numbers
+         give a wide flat sweep, near -90 points the axis at the camera and
+         flattens it to a circle. Transforming lerps toward `bandTiltOn` and
+         lifts the band clear of whatever the cloud became. */
+      const tilt = THREE.MathUtils.lerp(STATE.bandTilt, STATE.bandTiltOn, p);
+      group.rotation.x = THREE.MathUtils.degToRad(tilt)
                        + fluid.pointer.y * BAND.parallax * 0.25 * fluid.activation * motion;
       group.rotation.z = THREE.MathUtils.degToRad(BAND.roll)
                        + fluid.pointer.x * BAND.parallax * 0.18 * fluid.activation * motion;
+      group.position.set(
+        BAND.center[0],
+        BAND.center[1] + STATE.bandLift * p,
+        BAND.center[2],
+      );
     },
 
-    dispose,
+    dispose: disposeMesh,
   };
 }
 
 /* One tile of the band: the word plus a trailing gap, so tiling it around the
    circumference reads as continuous rather than as words jammed together. */
-function makeWordTexture(text) {
+function makeWordTexture(text, family) {
   const str = (text || '').trim() || 'EVERYWHERE';
   const FS = 256;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const font = `${BAND.fontWeight} ${FS}px ${BAND.fontFamily}`;
+  const font = `${BAND.fontWeight} ${FS}px ${family}`;
 
   ctx.font = font;
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${BAND.tracking}em`;
   const textW = Math.ceil(ctx.measureText(str).width);
   if (!textW) return null;
 
-  const w = Math.ceil(textW * (1 + BAND.gap));
+  const w = Math.min(4096, Math.ceil(textW * (1 + BAND.gap)));
   const h = Math.ceil(FS * 1.35);
   canvas.width = w; canvas.height = h;
 

@@ -9,7 +9,7 @@
      count  — reallocate the point buffers
    ========================================================================= */
 
-import { TARGETS, PALETTES, COLOR_MODES, STATE } from './config.js';
+import { TARGETS, PALETTES, COLOR_MODES, EFFECTS, STATE } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,16 +37,42 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     onTarget();
   }
 
-  /* ---- text ------------------------------------------------------------ */
-  const textEl = $('c-text');
-  textEl.value = STATE.text;
-  // Debounced: every keystroke would otherwise re-rasterise the band texture
-  // and re-sample the glyph coverage for the point target.
-  textEl.addEventListener('input', debounce(() => {
-    STATE.text = textEl.value;
-    onBand();
-    onTarget();
-  }, 300));
+  /* ---- text: two independent strings ----------------------------------
+     What the POINTS spell and what the BAND says are different jobs, so they
+     get different fields. Both are debounced: every keystroke would otherwise
+     re-rasterise a texture and re-sample glyph coverage. */
+  bindText('c-cloudtext', 'cloudText', () => onTarget());
+  bindText('c-bandtext', 'bandText', () => onBand());
+
+  function bindText(id, key, cb) {
+    const el = $(id);
+    el.value = STATE[key];
+    el.addEventListener('input', debounce(() => { STATE[key] = el.value; cb(); }, 300));
+  }
+
+  /* ---- font upload ------------------------------------------------------
+     Registered as a FontFace straight from the file's bytes. Nothing leaves
+     the browser, and both the band and the point-sampled text pick it up. */
+  const fontInput = $('c-font');
+  const fontLabel = $('v-font');
+  fontInput?.addEventListener('change', async () => {
+    const file = fontInput.files?.[0];
+    if (!file) return;
+    fontLabel.textContent = 'loading…';
+    try {
+      const face = new FontFace(`user-${Date.now()}`, await file.arrayBuffer());
+      await face.load();
+      document.fonts.add(face);
+      STATE.fontName = face.family;
+      fontLabel.textContent = file.name.replace(/\.[^.]+$/, '').slice(0, 22);
+      onBand();
+      onTarget();
+    } catch (err) {
+      // A font the browser can't parse is a normal thing for someone to try.
+      console.warn('[font] could not load', err);
+      fontLabel.textContent = 'unreadable file';
+    }
+  });
 
   /* ---- band on/off ----------------------------------------------------- */
   const bandRow = $('bandon-row');
@@ -63,6 +89,25 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     bandRow.appendChild(b);
   });
 
+  /* ---- band effect ----------------------------------------------------- */
+  const fxRow = $('effect-row');
+  EFFECTS.forEach((e) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'select-chip' + (e.id === STATE.bandEffect ? ' active' : '');
+    b.textContent = e.label;
+    b.addEventListener('click', () => {
+      STATE.bandEffect = e.id;
+      [...fxRow.children].forEach((c, i) => c.classList.toggle('active', EFFECTS[i].id === e.id));
+      onBand();
+    });
+    fxRow.appendChild(b);
+  });
+
+  const bandColEl = $('c-bandcol');
+  bandColEl.value = STATE.bandColor;
+  bandColEl.addEventListener('input', () => { STATE.bandColor = bandColEl.value; onBand(); });
+
   /* ---- sliders --------------------------------------------------------- */
   const sliders = [
     //  input       value out    state key       formatter                          cb        int?  debounce
@@ -75,6 +120,12 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     ['c-bandr',   'v-bandr',   'bandRepeats',  (v) => String(v),                  onBand, true, 150],
     ['c-bandt',   'v-bandt',   'bandTilt',     (v) => v.toFixed(0) + '°',    onBand],
     ['c-bands',   'v-bands',   'bandSpeed',    (v) => v.toFixed(2),               onLive],
+    ['c-bandfx',  'v-bandfx',  'bandStrength', (v) => v.toFixed(2),               onBand],
+
+    ['c-bandd2',   'v-bandd2',   'bandDiameterOn', (v) => v.toFixed(1),            onLive],
+    ['c-bandh2',   'v-bandh2',   'bandHeightOn',   (v) => v.toFixed(2),            onLive],
+    ['c-bandt2',   'v-bandt2',   'bandTiltOn',     (v) => v.toFixed(0) + '\u00b0', onLive],
+    ['c-bandlift', 'v-bandlift', 'bandLift',       (v) => v.toFixed(1),            onLive],
 
     ['c-count',   'v-count',   'count',        (v) => v.toLocaleString(),         onCount, true, 220],
     ['c-size',    'v-size',    'size',         (v) => v.toFixed(1) + ' px',       onLive],
@@ -177,6 +228,9 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     syncColors();
     STATE.colorMode = pick(COLOR_MODES).id;
     [...modeRow.children].forEach((c, i) => c.classList.toggle('active', COLOR_MODES[i].id === STATE.colorMode));
+    STATE.bandEffect = pick(EFFECTS).id;
+    [...fxRow.children].forEach((c, i) => c.classList.toggle('active', EFFECTS[i].id === STATE.bandEffect));
+    onBand();
     onLive();
   }
 

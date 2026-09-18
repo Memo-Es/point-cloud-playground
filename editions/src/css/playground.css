@@ -432,3 +432,18 @@ pre.code-out {
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
+
+/* File input, styled to match .btn — the native control can't be. */
+.file-btn {
+  display: block;
+  text-align: center;
+  padding: 9px 14px;
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,0.20);
+  color: var(--text-dim);
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+.file-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.4); }

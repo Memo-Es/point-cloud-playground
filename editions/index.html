@@ -66,9 +66,9 @@
         <div class="select-row" id="target-row" role="group" aria-label="Target"></div>
       </div>
       <div class="field">
-        <div class="field-row"><span class="field-name">Text</span></div>
-        <textarea class="text-input" id="c-text" rows="1" spellcheck="false">EVERYWHERE</textarea>
-        <p class="field-note">Drives both the band and the Text target. Short strings only — long ones sample thin.</p>
+        <div class="field-row"><span class="field-name">Cloud text</span></div>
+        <textarea class="text-input" id="c-cloudtext" rows="1" spellcheck="false">EVERYWHERE</textarea>
+        <p class="field-note">What the points spell when the target is Text. Short strings only — long ones sample thin.</p>
       </div>
       <div class="field">
         <div class="field-row"><span class="field-name">Speed</span><span class="field-value" id="v-morph"></span></div>
@@ -93,6 +93,17 @@
         <div class="select-row" id="bandon-row" role="group" aria-label="Show band"></div>
       </div>
       <div class="field">
+        <div class="field-row"><span class="field-name">Band text</span></div>
+        <textarea class="text-input" id="c-bandtext" rows="1" spellcheck="false">EVERYWHERE</textarea>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Typeface</span><span class="field-value" id="v-font">built-in</span></div>
+        <label class="file-btn" for="c-font">Upload a font file
+          <input type="file" id="c-font" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
+        </label>
+        <p class="field-note">.otf, .ttf, .woff or .woff2. Stays in your browser — nothing is uploaded anywhere.</p>
+      </div>
+      <div class="field">
         <div class="field-row"><span class="field-name">Diameter</span><span class="field-value" id="v-bandd"></span></div>
         <input type="range" id="c-bandd" min="3" max="26" step="0.2">
       </div>
@@ -112,6 +123,50 @@
       <div class="field">
         <div class="field-row"><span class="field-name">Spin</span><span class="field-value" id="v-bands"></span></div>
         <input type="range" id="c-bands" min="-0.8" max="0.8" step="0.01">
+      </div>
+    </div>
+
+    <!-- ── Band treatment ─────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">Band treatment</div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Effect</span></div>
+        <div class="select-row" id="effect-row" role="group" aria-label="Effect"></div>
+        <p class="field-note">Refract samples the cloud behind the letters and bends it — the type becomes glass.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Strength</span><span class="field-value" id="v-bandfx"></span></div>
+        <input type="range" id="c-bandfx" min="0" max="2" step="0.02">
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Tint</span></div>
+        <div class="color-row"><input type="color" id="c-bandcol" aria-label="Band tint"></div>
+      </div>
+    </div>
+
+    <!-- ── Transformed pose ───────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">Band when transformed</div>
+      <p class="field-note" style="margin-top:0;margin-bottom:14px">
+        Where the band goes once the cloud has changed. It lerps between the two
+        poses on the same curve as the morph.
+      </p>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Diameter</span><span class="field-value" id="v-bandd2"></span></div>
+        <input type="range" id="c-bandd2" min="3" max="26" step="0.2">
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Height</span><span class="field-value" id="v-bandh2"></span></div>
+        <input type="range" id="c-bandh2" min="0.1" max="7" step="0.05">
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Tilt</span><span class="field-value" id="v-bandt2"></span></div>
+        <input type="range" id="c-bandt2" min="-90" max="0" step="1">
+        <p class="field-note">Near 0° lays the ring level — a flat halo over the result.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><span class="field-name">Lift</span><span class="field-value" id="v-bandlift"></span></div>
+        <input type="range" id="c-bandlift" min="-6" max="8" step="0.1">
       </div>
     </div>
 
