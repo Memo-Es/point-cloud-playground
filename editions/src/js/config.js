@@ -1,192 +1,134 @@
 /* ============================================================================
    config.js — THE TUNING FILE
 
-   This is the only file you need to touch to redesign the piece.
-   Everything below is a knob. Nothing below is logic.
-
-   Colours are hex strings. Distances are in world units (the camera sits
-   ~14 units back, and the visible height at the origin is ~11.6 units, so
-   "1.0" is roughly 9% of the screen height).
+   Every number that shapes the piece is here, and none of it is logic.
    ========================================================================= */
 
 export const CONFIG = {
 
-  /* --- The word ----------------------------------------------------------
-     One word, repeated through the volume by `wordLayer` below. It stays
-     crisp vector type — it is NOT made of points. See word-layer.js.      */
-  words: {
-    hero: 'Everywhere',
-  },
+  /* The word that orbits the cloud. Stays crisp vector type — it is NOT made
+     of points. See word-layer.js. */
+  words: { hero: 'Everywhere' },
 
   /* --- Palette ------------------------------------------------------------
-     Points carry their own colour, baked per-scene by world.js. What lives
-     here is the grade applied on top of all of them, plus the page chrome.
-     To re-colour the world itself, edit PALETTE in world.js.              */
+     A three-stop gradient, applied in the shader from each point's position.
+     Changing any of this is a uniform write, not a rebuild.               */
   palette: {
-    /* Light, not dark. The scene is a bright misty photograph; anything the
-       points don't cover should read as sky, not as void. */
-    background: '#b4adbd',
-    accent:     '#ffe6f2',   // flash during a scatter transition
-    tint:       '#cfc7d6',
-    tintAmount: 0.06,
-    light:      '#ffe9f6',   // the volumetric shafts
+    background: '#07070b',
+    colors: ['#3B2E8F', '#C4603A', '#FFD9B0'],
+    accent:  '#FFF0DC',     // flash during a scatter transition
+    light:   '#6A4E86',     // the volumetric shafts
+    /* 0 height · 1 radius · 2 depth · 3 random */
+    colorMode: 1,
   },
 
-  /* --- The floating type --------------------------------------------------
-     Each entry is one copy of the word somewhere in the volume. `mirror`
-     flips it, `rot` is degrees [x,y,z], `depthGain` scales how much it
-     reacts to the cursor (near words should move more than far ones).
-
-     This is the layout knob with the most effect on the whole piece. Move
-     things, delete things, add things — nothing else depends on the count. */
-  wordLayer: {
-    /* The words ride a ring around the viewer rather than sitting at fixed
-       points in space. This is what produces the mirrored copies: a word on
-       the far side of the ring is simply being seen from behind. Flipping
-       type by hand would have been the wrong answer to the same picture. */
-    orbit: {
-      center:      [0, 0.40, -0.9],
-      radius:      3.6,
-      speed:       0.055,  // radians/sec of idle rotation
-      scrollSpeed: 2.10,   // radians per section scrolled — the main driver
-      tilt:        7,      // degrees the whole ring leans, so it isn't flat on
-      wobble:      0.55,   // vertical sway as a word comes round
-    },
-    drift:     0.10,   // idle float, on top of the orbit
-    parallax:  0.55,   // cursor response
-    scrollLag: 0.22,   // how much the words trail a fast scroll
-    fadeEnd:   0.92,   // fraction of section 0 after which they're gone
-
-    /* `angle` is the starting position on the ring, in degrees. `height` is
-       offset from the ring's centre. `spin` tilts the word within its own
-       plane. `radius` overrides the ring radius for that one word. */
-    instances: [
-      { angle:   0, height:  0.30, size: 0.62, opacity: 1.00, depthGain: 1.00, spin:  -2 },
-      { angle:  58, height:  0.55, size: 0.58, opacity: 0.95, depthGain: 0.90, spin:   4 },
-      { angle: 119, height: -0.65, size: 0.50, opacity: 0.88, depthGain: 0.70, spin:  -6, radius: 4.4 },
-      { angle: 176, height:  0.15, size: 0.66, opacity: 1.00, depthGain: 1.05, spin:   3 },
-      { angle: 236, height: -0.35, size: 0.44, opacity: 0.80, depthGain: 0.55, spin:   8, radius: 5.0 },
-      { angle: 298, height:  0.85, size: 0.40, opacity: 0.70, depthGain: 0.45, spin:  -5, radius: 4.7 },
-    ],
-  },
-
-  /* --- The points themselves ---------------------------------------------- */
+  /* --- The points ---------------------------------------------------------- */
   points: {
-    /* Small and hard. Photographic point clouds are built from tiny opaque
-       dots; the softness lives in how densely they're packed, not in each
-       dot's edges. Large feathered sprites are what make a cloud read as
-       bokeh instead of as an image. */
-    sizeBase:          3.6,   // px at 1x dpr, at `referenceDistance`
+    sizeBase:          2.8,    // px at 1x dpr, at `referenceDistance`
     referenceDistance: 10,
-    densityReference:  90000, // size is calibrated here, scaled by 1/sqrt(n)
-    sizeVariance:      0.45,
-    opacity:           1.00,  // points are opaque; fading is stochastic
-    softness:          0.30,  // 0 = hard discs, 1 = feathered
-    exposure:          1.06,
-    flow:              0.05,  // ambient drift. Low — this is a photograph.
-    flowSpeed:         0.18,
+    densityReference:  90000,  // size is calibrated here, scaled by 1/sqrt(n)
+    sizeVariance:      0.8,
+    opacity:           0.75,
+    softness:          0.45,   // 0 = hard dots, 1 = pure haze
+    glow:              0.95,
+    flow:              0.14,   // ambient drift. 0 freezes the cloud solid.
+    flowSpeed:         0.22,
   },
 
-  /* --- Scatter & reform ---------------------------------------------------
-     The signature move. Points leave formation, tumble through a cloud, and
-     re-converge into the next shape.                                       */
+  /* --- Scatter & reform ---------------------------------------------------- */
   morph: {
-    scatter:    3.4,   // how far points fly out at the midpoint of a transition
-    stagger:    0.55,  // 0 = all points move together, 0.9 = long lazy trail
-    turbulence: 1.1,   // swirl applied while scattered
-    holdStart:  0.45,  // fraction of a section spent FORMED before morphing
-    holdEnd:    0.95,  // fraction by which the next shape is fully formed
+    scatter:    3.8,
+    stagger:    0.58,
+    turbulence: 1.15,
+    holdStart:  0.45,   // fraction of a section spent FORMED before morphing
+    holdEnd:    0.95,
   },
 
   /* --- The fluid field ----------------------------------------------------
-     One shared source of "disturbance" fed by cursor position, cursor
-     velocity and scroll velocity. It drives point displacement, light
-     distortion and the bloom threshold — so everything reacts as one system
-     rather than as three unrelated effects.                                */
+     Cursor position, cursor speed and scroll velocity, smoothed once and read
+     by the points, the shafts and the words alike.                        */
   fluid: {
-    pointerRadius:  0.38,  // in NDC. 1.0 ≈ half the screen.
-    pointerPush:    0.55,  // world units of displacement at the cursor centre
-    pointerEase:    0.09,  // 0.01 = heavy and laggy, 0.3 = twitchy
-    velocityGain:   1.8,   // how much cursor SPEED adds on top of position
-    scrollSmear:    1.25,  // vertical stretch under fast scrolling
-    scrollSizeGain: 0.9,   // points swell as you scroll fast
-    decay:          0.92,  // per-frame decay of the whole field
+    pointerRadius:  0.38,
+    pointerPush:    0.55,
+    pointerEase:    0.09,
+    velocityGain:   1.8,
+    scrollSmear:    1.25,
+    scrollSizeGain: 0.9,
+    decay:          0.92,
   },
 
   /* --- Camera -------------------------------------------------------------
-     One entry per scene, in scene order. The camera lerps continuously
-     between them (no hold), which is what gives the parallax against the
-     DOM copy, which does hold.                                             */
+     One entry per scene. The camera lerps continuously between them while the
+     cloud HOLDS formed — that mismatch is where the parallax comes from.  */
   camera: {
-    fov:  45,
-    near: 0.1,
-    far:  120,
+    fov: 45, near: 0.1, far: 120,
     keys: [
-      { pos: [ 0.0,  0.10,  9.6], look: [0,  0.0, -2] },  // 0 hero
-      { pos: [ 0.0, -0.30,  5.6], look: [0,  0.1, -4] },  // 1 push into it
-      { pos: [ 2.4,  1.10,  9.0], look: [0,  0.0,  0] },  // 2 sphere
-      { pos: [-2.1,  0.70,  8.2], look: [0,  0.0,  0] },  // 3 panels
-      { pos: [ 0.0,  3.10,  8.6], look: [0, -0.8, -2] },  // 4 wave
-      { pos: [ 0.0,  0.10, 10.4], look: [0,  0.0, -2] },  // 5 back to it
-      { pos: [ 0.0,  0.60, 14.5], look: [0,  0.1, -2] },  // 6 pull out
+      { pos: [ 0.0,  0.0, 10.5], look: [0,  0.0, 0] },  // 0 hero
+      { pos: [ 0.0, -0.6,  7.6], look: [0, -0.2, 0] },  // 1 sphere
+      { pos: [ 2.4,  1.0,  9.0], look: [0,  0.0, 0] },  // 2 helix
+      { pos: [-2.2,  0.7,  8.4], look: [0,  0.0, 0] },  // 3 wave
+      { pos: [ 0.0,  2.8,  8.8], look: [0, -0.6, 0] },  // 4 galaxy
+      { pos: [ 1.6,  0.4,  9.4], look: [0,  0.0, 0] },  // 5 torus
+      { pos: [ 0.0,  0.3, 14.0], look: [0,  0.0, 0] },  // 6 outro
     ],
-    /* How hard the camera drifts with the cursor. Small numbers only. */
     parallax: 0.55,
     parallaxEase: 0.045,
   },
 
-  /* --- Volumetric light ---------------------------------------------------
-     Stacked additive gradient quads that drift and get distorted by the
-     fluid field. A cheap stand-in for true raymarched light volumes.       */
+  /* --- Volumetric light ---------------------------------------------------- */
   light: {
-    layers:    5,
-    /* `intensity` is the brightness of the whole STACK, calibrated at this
-       many layers and divided down when a tier draws more. Same reasoning as
-       points.densityReference. */
-    referenceLayers: 3,
-    spread:    26,    // world units the shafts cover
-    intensity: 0.07,   // subtle: the main light is painted into the image
-    drift:     0.035,
-    distortion: 1.4,  // how much the fluid field bends the shafts
+    layers: 3,
+    referenceLayers: 3,   // intensity is the brightness of the whole STACK
+    spread: 26,
+    intensity: 0.22,
+    drift: 0.035,
+    distortion: 1.4,
   },
 
-  /* --- Post-processing ---------------------------------------------------- */
-  bloom: {
-    /* Restrained on purpose. A wide, strong bloom over a large dark field
-       lifts every pixel off black and the piece stops reading as night. The
-       job here is to halo the hot cores where points overlap, nothing more. */
-    strength:  0.30,
-    radius:    0.50,
-    threshold: 0.42,
-  },
+  bloom: { strength: 0.42, radius: 0.7, threshold: 0.30 },
 
-  /* --- GPU tiers ----------------------------------------------------------
-     Four tiers, picked at boot from hardware signals, then downgraded live
-     if the frame budget is missed. Tier 0 must run on a cheap phone.       */
+  /* --- GPU tiers ----------------------------------------------------------- */
   tiers: [
     { name: 'low',   points:  40000, dpr: 1.00, bloom: false, lightLayers: 2 },
     { name: 'mid',   points:  90000, dpr: 1.35, bloom: false, lightLayers: 3 },
-    { name: 'high',  points: 150000, dpr: 1.75, bloom: false, lightLayers: 3 },
-    { name: 'ultra', points: 220000, dpr: 2.00, bloom: false, lightLayers: 3 },
+    { name: 'high',  points: 150000, dpr: 1.75, bloom: true,  lightLayers: 3 },
+    { name: 'ultra', points: 220000, dpr: 2.00, bloom: true,  lightLayers: 3 },
   ],
 
-  /* --- Scroll -------------------------------------------------------------
-     Lenis smoothing. Disabled entirely under prefers-reduced-motion.       */
-  scroll: {
-    lerp:            0.085,
-    wheelMultiplier: 1.0,
-    velocityClamp:   2.5,
-  },
+  scroll: { lerp: 0.085, wheelMultiplier: 1.0, velocityClamp: 2.5 },
 
-  /* --- Text sampling ------------------------------------------------------
-     How the words get turned into points. `worldWidth` is how wide the
-     longest word is allowed to be, in world units.                         */
   text: {
     fontFamily: "'Inter Tight', 'Helvetica Neue', Arial, sans-serif",
     fontWeight: 800,
-    tracking:   -0.04,   // em. Negative = tighter.
+    tracking: -0.04,
     worldWidth: 15.5,
-    depth:      0.55,    // z-thickness of the sampled slab
-    jitter:     0.035,   // softens the pixel grid the sampler reads from
+  },
+
+  /* --- The floating type --------------------------------------------------
+     The words ride a ring around the viewer. Rotating each plane by its own
+     orbit angle points it radially outward, so a word at the back is seen
+     FROM BEHIND — the mirroring is geometry, not a flipped texture, which is
+     why it survives the words moving.                                     */
+  wordLayer: {
+    orbit: {
+      center: [0, 0.40, -0.9],
+      radius: 3.6,
+      speed: 0.055,
+      scrollSpeed: 2.10,
+      tilt: 7,
+      wobble: 0.55,
+    },
+    drift: 0.10,
+    parallax: 0.55,
+    scrollLag: 0.22,
+    fadeEnd: 0.92,
+    instances: [
+      { angle:   0, height:  0.30, size: 0.62, opacity: 1.00, depthGain: 1.00, spin: -2 },
+      { angle:  58, height:  0.55, size: 0.58, opacity: 0.95, depthGain: 0.90, spin:  4 },
+      { angle: 119, height: -0.65, size: 0.50, opacity: 0.88, depthGain: 0.70, spin: -6, radius: 4.4 },
+      { angle: 176, height:  0.15, size: 0.66, opacity: 1.00, depthGain: 1.05, spin:  3 },
+      { angle: 236, height: -0.35, size: 0.44, opacity: 0.80, depthGain: 0.55, spin:  8, radius: 5.0 },
+      { angle: 298, height:  0.85, size: 0.40, opacity: 0.70, depthGain: 0.45, spin: -5, radius: 4.7 },
+    ],
   },
 };

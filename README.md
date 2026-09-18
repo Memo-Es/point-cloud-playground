@@ -16,7 +16,7 @@ readouts.
 | | |
 |---|---|
 | `/` | **The playground.** Everything below describes this. |
-| `/editions/` | **A separate experiment** chasing the look of Shopify Editions Spring '26 — a scroll page whose cloud is sampled from a painted image, with type on a 3D orbit ring. Self-contained: its own copy of every module, importing nothing from the playground, so work in there cannot break this. |
+| `/editions/` | **A separate experiment** after Shopify Editions Spring '26 — a scroll page where the cloud moves through abstract volumes while type orbits it on a 3D ring. Self-contained: its own copy of every module, importing nothing from the playground, so work in there cannot break this. |
 
 
 ## Run it
