@@ -45,6 +45,7 @@ export function createWordBand() {
     uColor:      { value: new THREE.Color(STATE.bandColor) },
     uOpacity:    { value: 1 },
     uTime:       { value: 0 },
+    uRepeat:     { value: -3 },
   };
 
   function build() {
@@ -52,13 +53,13 @@ export function createWordBand() {
 
     texture = makeWordTexture(STATE.bandText, fontFamily());
     if (!texture) return;
+    /* wrapS must stay RepeatWrapping so uv.x beyond 1 tiles. The COUNT is
+       applied in the fragment shader via uRepeat, not through texture.repeat:
+       three only feeds texture.repeat into its own materials' uvTransform,
+       so on a custom ShaderMaterial it is silently ignored. */
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
-    /* A negative repeat mirrors the map. The camera looks into the tube, so
-       the wall facing us is the cylinder's INSIDE and the type would come out
-       backwards; flipping puts the readable face where you look and leaves
-       the far wall mirrored, which is the effect we wanted anyway. */
-    texture.repeat.set(-effectiveRepeats(), 1);
+    uniforms.uRepeat.value = -effectiveRepeats();
 
     uniforms.uMap.value = texture;
     uniforms.uTexel.value.set(1 / texture.image.width, 1 / texture.image.height);
@@ -109,6 +110,7 @@ export function createWordBand() {
   /* Cheap per-frame settings. Nothing here rebuilds anything. */
   function apply() {
     if (!mesh) return;
+    uniforms.uRepeat.value = -effectiveRepeats();
     uniforms.uMode.value = EFFECT_IDS[STATE.bandEffect] ?? 0;
     uniforms.uStrength.value = STATE.bandStrength;
     uniforms.uColor.value.set(STATE.bandColor);
@@ -145,7 +147,7 @@ export function createWordBand() {
       if (!mesh || !STATE.bandOn) return;
       uniforms.uTime.value = time;
 
-      if (texture) texture.repeat.x = -effectiveRepeats();
+      uniforms.uRepeat.value = -effectiveRepeats();
 
       /* `stay` holds the rest pose and lets the cloud change underneath,
          which is a different and often better read than the band moving too. */

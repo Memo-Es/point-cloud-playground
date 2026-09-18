@@ -22,6 +22,11 @@ uniform float uStrength;
 uniform vec3  uColor;
 uniform float uOpacity;
 uniform float uTime;
+/* Signed tile count across the band. A custom ShaderMaterial does NOT get
+   three's uvTransform, which is what applies texture.repeat for the built-in
+   materials — so the tiling has to be done here by hand. Negative mirrors,
+   which is how the readable face ends up where the camera looks. */
+uniform float uRepeat;
 
 varying vec2 vUv;
 varying vec3 vViewNormal;
@@ -33,14 +38,15 @@ vec3 iridescent(float t) {
 }
 
 void main() {
-  float a = texture2D(uMap, vUv).a;
+  vec2 uv = vec2(vUv.x * uRepeat, vUv.y);
+  float a = texture2D(uMap, uv).a;
   if (a < 0.35) discard;          // a hard cutout, so the band writes depth
 
   /* Edge gradient, used as a stand-in normal. */
-  float ax = texture2D(uMap, vUv + vec2(uTexel.x, 0.0)).a
-           - texture2D(uMap, vUv - vec2(uTexel.x, 0.0)).a;
-  float ay = texture2D(uMap, vUv + vec2(0.0, uTexel.y)).a
-           - texture2D(uMap, vUv - vec2(0.0, uTexel.y)).a;
+  float ax = texture2D(uMap, uv + vec2(uTexel.x, 0.0)).a
+           - texture2D(uMap, uv - vec2(uTexel.x, 0.0)).a;
+  float ay = texture2D(uMap, uv + vec2(0.0, uTexel.y)).a
+           - texture2D(uMap, uv - vec2(0.0, uTexel.y)).a;
   vec2 grad = vec2(ax, ay);
   float edge = clamp(length(grad) * 6.0, 0.0, 1.0);
 
@@ -69,16 +75,16 @@ void main() {
 
   } else if (uMode > 1.5) {
     /* --- chromatic --- the glyph itself splits into coloured fringes. */
-    float r = texture2D(uMap, vUv + grad * uStrength * 0.12).a;
+    float r = texture2D(uMap, uv + grad * uStrength * 0.12).a;
     float g = a;
-    float b = texture2D(uMap, vUv - grad * uStrength * 0.12).a;
+    float b = texture2D(uMap, uv - grad * uStrength * 0.12).a;
     col = uColor * vec3(r, g, b);
     col += edge * uStrength * 0.5 * vec3(1.0, 0.75, 0.9);
 
   } else if (uMode > 0.5) {
     /* --- iridescent --- hue keyed to position along the band and to view
        angle, so the colour travels as the band turns. */
-    float t = vUv.x * 3.0 + fres * 1.4 + uTime * 0.05;
+    float t = uv.x * 3.0 + fres * 1.4 + uTime * 0.05;
     col = mix(uColor, iridescent(t), clamp(uStrength, 0.0, 1.0));
     col += fres * 0.5;
   }
