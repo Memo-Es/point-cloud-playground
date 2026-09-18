@@ -16,7 +16,7 @@ readouts.
 | | |
 |---|---|
 | `/` | **The playground.** Everything below describes this. |
-| `/editions/` | **A separate experiment** after Shopify Editions Spring '26 — a scroll page where the cloud moves through abstract volumes while type orbits it on a 3D ring. Self-contained: its own copy of every module, importing nothing from the playground, so work in there cannot break this. |
+| `/editions/` | **A second playground.** An abstract cloud that transforms into a shape or your own text on one trigger, inside a rotating 3D band of type you can size and tilt. Same control language as this one. Self-contained: its own copy of every module, importing nothing from the playground, so work in there cannot break this. |
 
 
 ## Run it
