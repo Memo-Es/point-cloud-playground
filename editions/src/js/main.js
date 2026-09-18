@@ -40,8 +40,11 @@ async function boot() {
     preserveDrawingBuffer: true,
   });
 
+  /* Tiering caps the pixel ratio only. It used to overwrite STATE.count too,
+     which quietly discarded whatever count was saved as the default — a
+     default that boot throws away is not a default. The slider is right
+     there if a machine can't hold the frame rate. */
   const tier = TIERS[detectTier(renderer)];
-  STATE.count = tier.count;
   const dpr = () => Math.min(window.devicePixelRatio || 1, tier.dpr);
   renderer.setPixelRatio(dpr());
 

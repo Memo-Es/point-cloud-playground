@@ -48,22 +48,27 @@ export const ON_TRANSFORM = [
 ];
 
 export const STATE = {
-  /* The one transformation. The cloud is the rest state; firing the trigger
-     sends it to `target`, firing again brings it back. */
+  /* Saved from a session in the playground — Export > Settings > Copy round
+     -trips back into here. */
+
   target: 'text',
   /* Two separate strings on purpose: what the POINTS spell and what the BAND
      says are usually not the same thing. */
-  cloudText: 'EVERYWHERE',
-  bandText: 'EVERYWHERE',
-  /* Set when a font file is uploaded; empty means the built-in stack. */
+  cloudText: '30 M',
+  bandText: 'Series A',
+  /* Set when a font file is uploaded. Deliberately empty here: an uploaded
+     face is registered under a generated id that means nothing on reload, so
+     baking one in would just fall back to the built-in stack anyway. To ship
+     a real default typeface the file has to live in the repo. */
   fontName: '',
   transformed: false,
 
-  // Cloud
-  count: 90000,
+  /* Cloud. `count` is honoured as written — device tiering only caps the
+     pixel ratio now, so a saved default survives the boot. */
+  count: 180000,
   size: 2.6,
-  scale: 1.0,
-  thickness: 0.35,
+  scale: 1.32,
+  thickness: 0.53,
   drift: 0.20,
 
   // Transformation
@@ -73,13 +78,13 @@ export const STATE = {
 
   /* The result, once transformed. `textDepth` extrudes the text target into a
      slab; tilt rocks the whole result so a 3D form reads as one. */
-  textDepth: 0.55,
+  textDepth: 0.38,
   tiltAmount: 0.22,
   tiltSpeed: 0.35,
 
   // The word band — rest pose
   bandOn: true,
-  bandDiameter: 12.0,
+  bandDiameter: 6.6,
   bandHeight: 2.8,
   bandRepeats: 3,
   /* Auto derives the repeat count from the circumference, so letters keep
@@ -98,12 +103,12 @@ export const STATE = {
   bandDiameterOn: 9.0,
   bandHeightOn: 1.2,
   bandTiltOn: -4,
-  bandLift: 3.2,
+  bandLift: 8.0,
 
   // Band treatment
-  bandEffect: 'refract',
-  bandStrength: 0.6,
-  bandColor: '#FFFFFF',
+  bandEffect: 'solid',
+  bandStrength: 0.26,
+  bandColor: '#f4edde',
 
   /* Camera. `zoom` is the resting distance; `zoomOn` is where it dollies to
      once the cloud has transformed, so the push-in is part of the gesture
@@ -115,15 +120,15 @@ export const STATE = {
   breatheSpeed: 0.18,
 
   // Interaction
-  force: 0.9,
-  radius: 0.36,
+  force: 0,
+  radius: 0.05,
 
   // Colour
-  palette: 'dusk',
-  colors: ['#3B2E8F', '#C4603A', '#FFD9B0'],
-  background: '#07070b',
-  colorMode: 1,
-  glow: 0.95,
+  palette: 'custom',
+  colors: ['#fec796', '#fb5646', '#2e79d8'],
+  background: '#07070e',
+  colorMode: 2,
+  glow: 0.42,
 
   paused: false,
 };
