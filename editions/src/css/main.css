@@ -1,0 +1,340 @@
+/* ============================================================================
+   main.css
+
+   The DOM layer. It sits on top of a fixed canvas and scrolls past it. Its
+   only real job is to stay legible over a moving field of light, which is
+   mostly a question of contrast floors and generous negative space.
+   ========================================================================= */
+
+:root {
+  --bg:      #0d1014;
+  --ink:     #f2f5ff;
+  --ink-dim: #b3b0c4;
+  --ink-soft: #cfcbdb;
+  --accent:  #ffd9ec;
+  --rule:    rgba(255,255,255,.12);
+
+  --gutter: clamp(20px, 5vw, 76px);
+  --measure: 34ch;
+
+  --f-eyebrow: clamp(.72rem, .68rem + .2vw, .82rem);
+  --f-body:    clamp(1rem, .95rem + .35vw, 1.2rem);
+  --f-h2:      clamp(1.9rem, 1.2rem + 2.6vw, 3.6rem);
+  --f-lede:    clamp(1.2rem, 1rem + 1vw, 1.75rem);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: auto; }         /* Lenis owns smoothing; see scroll.js */
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: var(--f-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#gl {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+
+/* --- loader --------------------------------------------------------------
+   Covers the moment between first paint and the point cloud existing, which
+   is a few hundred ms of shader compile and font loading.                 */
+#loader {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--bg);
+  display: grid; place-items: center;
+  transition: opacity .7s ease, visibility .7s;
+}
+#loader span {
+  width: 34px; height: 1px; background: var(--rule); position: relative; overflow: hidden;
+}
+#loader span::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent);
+  transform-origin: left;
+  animation: sweep 1.1s ease-in-out infinite;
+}
+@keyframes sweep {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  50%  { transform: scaleX(1); transform-origin: left; }
+  51%  { transform: scaleX(1); transform-origin: right; }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+#loader.is-done { opacity: 0; visibility: hidden; }
+
+/* --- chrome -------------------------------------------------------------
+   A bar over a moving, fairly bright volume. `mix-blend-mode: difference`
+   was the wrong tool here — against a pale lavender haze it inverts to a
+   muddy olive. A small text-shadow is less clever and far more legible.  */
+.chrome {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(14px, 1.9vw, 22px) var(--gutter);
+  font-size: var(--f-eyebrow);
+  pointer-events: none;
+}
+.chrome > * { pointer-events: auto; }
+.chrome__left, .chrome__right {
+  display: flex; align-items: center; gap: clamp(1rem, 2.4vw, 2.4rem);
+}
+
+.mark {
+  display: inline-flex; align-items: center; gap: .5em;
+  color: var(--ink); text-decoration: none;
+  font-weight: 500; letter-spacing: -.01em;
+  text-shadow: 0 1px 12px rgba(10,12,18,.55);
+}
+.mark__glyph {
+  width: 15px; height: 15px; border-radius: 4px;
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+}
+.mark__muted { color: var(--ink-dim); font-weight: 400; }
+
+.chrome__nav { display: flex; gap: clamp(.9rem, 2vw, 1.8rem); }
+.chrome__nav a, .hero__index a {
+  color: var(--ink); text-decoration: none;
+  text-shadow: 0 1px 12px rgba(10,12,18,.55);
+  transition: opacity .2s ease;
+}
+.chrome__nav a:hover, .hero__index a:hover { opacity: .62; }
+
+#motion-toggle {
+  display: inline-flex; align-items: center; gap: .55em;
+  font: inherit; color: var(--ink);
+  background: rgba(14,16,22,.35);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 999px;
+  padding: .45em 1em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color .25s ease, background-color .25s ease;
+}
+#motion-toggle:hover { border-color: rgba(255,255,255,.5); }
+#motion-toggle .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  transition: background-color .25s ease, transform .25s ease;
+}
+#motion-toggle[aria-pressed="false"] .dot { background: var(--ink-dim); transform: scale(.7); }
+
+.pill {
+  background: var(--ink); color: #14161c;
+  text-decoration: none; font-weight: 500;
+  padding: .5em 1.15em; border-radius: 999px;
+  transition: transform .25s cubic-bezier(.22,.61,.36,1), opacity .25s ease;
+}
+.pill:hover { transform: translateY(-1px); opacity: .9; }
+
+@media (max-width: 720px) {
+  .chrome__nav { display: none; }
+  .chrome { gap: .75rem; }
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--ink); color: var(--bg);
+  padding: .8em 1.2em; border-radius: 0 0 6px 0; font-size: .9rem;
+}
+.skip:focus { left: 0; }
+
+/* --- progress rail -------------------------------------------------------- */
+.rail {
+  position: fixed; right: calc(var(--gutter) * .45); top: 22vh; bottom: 22vh;
+  width: 1px; background: var(--rule); z-index: 30;
+}
+#rail-fill {
+  display: block; width: 100%; height: 100%;
+  background: var(--accent);
+  transform-origin: top; transform: scaleY(0);
+}
+
+/* --- sections ------------------------------------------------------------- */
+.s {
+  position: relative; z-index: 10;
+  min-height: 100svh;
+  display: flex; align-items: center;
+  padding: clamp(80px, 12vh, 160px) var(--gutter);
+}
+.s--center { justify-content: center; text-align: center; }
+
+/* The volume behind the copy is now a bright haze, not near-black. Body text
+   over it needs its own ground to stay readable — a soft local scrim rather
+   than a panel, so the picture still shows through. */
+.s:not(.s--hero) .wrap {
+  --scrim: radial-gradient(120% 100% at 50% 50%, rgba(13,16,20,.82) 0%, rgba(13,16,20,.62) 45%, rgba(13,16,20,0) 100%);
+  background: var(--scrim);
+  padding: clamp(1.6rem, 4vw, 3.4rem);
+  border-radius: 20px;
+}
+.s--right  { justify-content: flex-end; }
+.s--left   { justify-content: flex-start; }
+
+.wrap { width: 100%; max-width: 1240px; margin-inline: auto; }
+.wrap.col { max-width: 46ch; margin-inline: 0; }
+.s--center .wrap.col { margin-inline: auto; }
+.wrap.narrow { max-width: 58ch; margin-inline: auto; }
+
+/* The hero deliberately leaves the middle of the frame empty. The picture
+   is the content; the DOM keeps to the bottom edge. */
+.s--hero {
+  align-items: flex-end;
+  padding-bottom: clamp(28px, 4.5vh, 56px);
+}
+.hero__foot {
+  width: 100%; max-width: 1400px; margin-inline: auto;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: clamp(1.5rem, 6vw, 6rem);
+}
+.hero__tagline {
+  margin: 0; max-width: 34ch;
+  color: var(--ink);
+  font-size: clamp(.95rem, .9rem + .3vw, 1.12rem);
+  line-height: 1.35;
+  text-shadow: 0 1px 14px rgba(10,12,18,.6);
+}
+.hero__index {
+  display: flex; gap: clamp(1.4rem, 4vw, 3.6rem);
+  font-size: var(--f-eyebrow);
+}
+.hero__index ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .5em; }
+.hero__index a { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+@media (max-width: 860px) {
+  .hero__foot { flex-direction: column; align-items: flex-start; gap: 1.6rem; }
+  .hero__index { flex-wrap: wrap; gap: 1.2rem 2rem; }
+}
+
+.eyebrow {
+  font-size: var(--f-eyebrow);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: 0 0 1.4em;
+}
+.lede { font-size: var(--f-lede); line-height: 1.35; margin: 0 0 2em; text-wrap: balance; }
+.cue {
+  font-size: var(--f-eyebrow); letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-dim); margin: 0;
+}
+.cue::after {
+  content: ''; display: block; width: 1px; height: 40px; margin: 12px auto 0;
+  background: linear-gradient(var(--ink-dim), transparent);
+}
+
+h2 {
+  font-size: var(--f-h2);
+  line-height: 1.04;
+  letter-spacing: -.035em;
+  font-weight: 800;
+  margin: 0 0 .7em;
+  text-wrap: balance;
+}
+p { color: var(--ink-soft); margin: 0 0 1.2em; max-width: var(--measure); }
+/* `p` is measure-capped, which makes it a narrow block. In a centred section
+   that block must also be centred, or text-align merely centres the words
+   inside a box still pinned to the left. */
+.s--center p,
+.s--hero p { margin-inline: auto; }
+.wrap.narrow p,
+.s--center .wrap.narrow p { max-width: none; }
+
+.num {
+  display: block;
+  font-size: var(--f-eyebrow); letter-spacing: .16em;
+  color: var(--accent); margin-bottom: 1.6em;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .9em;
+  background: rgba(255,255,255,.07);
+  padding: .15em .45em; border-radius: 4px;
+  color: var(--ink);
+}
+
+.fine { font-size: .9rem; color: rgba(154,163,189,.7); margin-top: 3em; }
+
+/* --- the index list -------------------------------------------------------- */
+.s--index { align-items: center; }
+.index { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.index li {
+  display: grid;
+  grid-template-columns: minmax(9rem, 22%) 1fr;
+  gap: clamp(1rem, 4vw, 4rem);
+  padding: clamp(1.1rem, 2.2vw, 1.9rem) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.index span { font-weight: 500; letter-spacing: -.01em; }
+.index em { font-style: normal; color: var(--ink-dim); max-width: 56ch; }
+@media (max-width: 640px) {
+  .index li { grid-template-columns: 1fr; gap: .4rem; }
+}
+
+/* --- reveals --------------------------------------------------------------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity .9s cubic-bezier(.22,.61,.36,1), transform .9s cubic-bezier(.22,.61,.36,1);
+}
+[data-reveal].is-in { opacity: 1; transform: none; }
+.index li:nth-child(1) { transition-delay: .00s; }
+.index li:nth-child(2) { transition-delay: .05s; }
+.index li:nth-child(3) { transition-delay: .10s; }
+.index li:nth-child(4) { transition-delay: .15s; }
+.index li:nth-child(5) { transition-delay: .20s; }
+.index li:nth-child(6) { transition-delay: .25s; }
+.index li:nth-child(7) { transition-delay: .30s; }
+
+[data-intro] { opacity: 0; }
+
+/* --- utilities ------------------------------------------------------------- */
+.sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* Shown only when WebGL never started. */
+.nogl {
+  display: none;
+  position: relative; z-index: 10;
+  max-width: 52ch; margin: 0 auto 12vh; padding: 0 var(--gutter);
+  font-size: .95rem;
+}
+.no-webgl #gl,
+.no-webgl .rail { display: none; }
+.no-webgl .nogl { display: block; }
+.no-webgl body  { background: var(--bg); }
+.no-webgl .sr {
+  position: static; width: auto; height: auto;
+  margin: 0 0 .4em; clip: auto; clip-path: none;
+  font-size: var(--f-h2); letter-spacing: -.04em; line-height: 1.02;
+}
+
+/* --- reduced motion --------------------------------------------------------
+   The canvas keeps rendering — it just stops moving (uMotion goes to 0 in the
+   shader). Removing it entirely would strip the page of its only visual
+   identity; freezing it removes the vestibular risk, which is the actual
+   requirement.                                                            */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .index li { transition-delay: 0s !important; }
+  [data-intro]  { opacity: 1; }
+  #loader span::after { animation: none; transform: scaleX(1); }
+  .cue::after { display: none; }
+  * { scroll-behavior: auto !important; }
+}

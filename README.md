@@ -11,6 +11,14 @@ readouts.
 
 **Live:** https://memo-es.github.io/point-cloud-playground/
 
+## Two pages in here
+
+| | |
+|---|---|
+| `/` | **The playground.** Everything below describes this. |
+| `/editions/` | **A separate experiment** chasing the look of Shopify Editions Spring '26 — a scroll page whose cloud is sampled from a painted image, with type on a 3D orbit ring. Self-contained: its own copy of every module, importing nothing from the playground, so work in there cannot break this. |
+
+
 ## Run it
 
 No build step, no install. It does need to be served over HTTP — ES modules
