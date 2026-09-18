@@ -78,6 +78,7 @@ export const STATE = {
 
   /* The result, once transformed. `textDepth` extrudes the text target into a
      slab; tilt rocks the whole result so a 3D form reads as one. */
+  textSize: 1.0,
   textDepth: 0.38,
   tiltAmount: 0.22,
   tiltSpeed: 0.35,

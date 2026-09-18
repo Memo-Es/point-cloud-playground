@@ -181,7 +181,8 @@ const GENERATORS = {
   /* Text is rasterised to an offscreen canvas and sampled where the glyphs
      cover pixels. Must run after document.fonts.ready or the sampler reads
      the fallback font and the word comes out the wrong shape. */
-  text(count, { thickness = 0, text = 'HELLO', fontFamily = "'Inter', sans-serif", seed = 77, depth = 0.5 } = {}) {
+  text(count, { thickness = 0, text = 'HELLO', fontFamily = "'Inter', sans-serif",
+                seed = 77, depth = 0.5, size = 1 } = {}) {
     const rand = rng(seed);
     const out = new Float32Array(count * 3);
     const str = (text || '').trim() || 'HELLO';
@@ -201,21 +202,48 @@ const GENERATORS = {
     ctx.fillText(str, w / 2, h / 2);
 
     const data = ctx.getImageData(0, 0, w, h).data;
+
+    /* Collect the lit pixels AND their bounds in the same pass. The bounds
+       are what the word actually inks, which is not the canvas: the canvas
+       carries padding and a fixed line height, so measuring it instead makes
+       a two-glyph string claim the same box as a ten-glyph one. */
     const lit = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        if (data[(y * w + x) * 4 + 3] > 128) lit.push(x, y);
+        if (data[(y * w + x) * 4 + 3] > 128) {
+          lit.push(x, y);
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
       }
     }
     if (!lit.length) return GENERATORS.sphere(count, { thickness, seed });
 
-    // Fit the word to the family radius however long it is.
-    const scale = (R * 2.3) / w;
-    const n = lit.length / 2;
+    const inkW = Math.max(1, maxX - minX);
+    const inkH = Math.max(1, maxY - minY);
+
+    /* Fit inside a box on BOTH axes, not just width.
+
+       Fitting by width alone was the bug: "30 M" and "EVERYWHERE" were both
+       stretched to the same world width, which made the short one's letters
+       about four times taller, and it ran straight off the top and bottom of
+       the frame. min() of the two ratios means the word touches whichever
+       edge it reaches first and never overflows the other. */
+    const boxW = R * 2.2;
+    const boxH = R * 1.15;
+    const scale = Math.min(boxW / inkW, boxH / inkH) * Math.max(0.05, size);
+
+    // Centre on the ink, not on the canvas, so padding never shifts the word.
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
     for (let i = 0; i < count; i++) {
-      const p = ((rand() * n) | 0) * 2;
-      out[i * 3] = (lit[p] + rand() - 0.5 - w / 2) * scale;
-      out[i * 3 + 1] = -(lit[p + 1] + rand() - 0.5 - h / 2) * scale;
+      const p = ((rand() * (lit.length / 2)) | 0) * 2;
+      out[i * 3] = (lit[p] + rand() - 0.5 - cx) * scale;
+      out[i * 3 + 1] = -(lit[p + 1] + rand() - 0.5 - cy) * scale;
       /* A real slab, not a decal. The old 0.14 gave a sheet of points that
          vanished edge-on the moment anything rotated; `depth` extrudes the
          glyphs so the word has a front and a back to turn between. */

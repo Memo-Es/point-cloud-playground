@@ -142,6 +142,7 @@ export function initControls({ onTarget, onCount, onLive, onBand, onAction, onEx
     ['c-morph',   'v-morph',   'morphTime',    (v) => v.toFixed(2) + ' s',        onLive],
     ['c-scatter', 'v-scatter', 'scatter',      (v) => v.toFixed(1),               onLive],
     ['c-stagger', 'v-stagger', 'stagger',      (v) => v.toFixed(2),               onLive],
+    ['c-tsize',   'v-tsize',   'textSize',     (v) => v.toFixed(2) + '\u00d7',    onTarget, false, 180],
     ['c-tdepth',  'v-tdepth',  'textDepth',    (v) => v.toFixed(2),               onTarget, false, 180],
     ['c-tilta',   'v-tilta',   'tiltAmount',   (v) => v.toFixed(2),               onLive],
     ['c-tilts',   'v-tilts',   'tiltSpeed',    (v) => v.toFixed(2),               onLive],

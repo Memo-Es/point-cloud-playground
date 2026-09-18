@@ -74,6 +74,7 @@ async function boot() {
     text: STATE.cloudText,
     fontFamily: fontStack(),
     depth: STATE.textDepth,
+    size: STATE.textSize,
   });
 
   /* The cloud gets its own pivot inside the group. Tilting the RESULT should
